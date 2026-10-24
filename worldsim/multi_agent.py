@@ -716,6 +716,8 @@ class MultiAgentSimulation:
             intents=intents_for_detector,
             collisions=collisions,
             moved_flags=moved_flags,
+            coordinator=self.coordinator,
+            resources=tuple(r.position for r in self._state.resources),
         )
 
         recharge_outcomes = {}

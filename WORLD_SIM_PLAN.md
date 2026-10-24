@@ -1,5 +1,40 @@
 # WorldSim Plan
 
+## Phase 14.1 status
+
+Phase 14.1 (Determinism & Telemetry Cleanup) completes the foundational cleanup of the multi-agent coordination layer before decentralized learning, eliminating nondeterministic agent arbitration and enriching deadlock telemetry to differentiate between benign cooperative waiting and true structural deadlocks:
+1. **Deterministic Agent Arbitration (`ResourceArbitrator`):**
+   - Replaced Python's process-dependent `hash(aid)` tie-breaker under the `need_urgency` rule in `ResourceArbitrator` with the stable, deterministic `agent_val(aid)` mapping.
+   - Codebase audit confirms zero built-in `hash()` invocations across the entire `worldsim/` package.
+   - Verified cross-process determinism across independent subprocess invocations with randomized `PYTHONHASHSEED` (`0`, `999999`, `random`).
+2. **Deadlock Telemetry & Classification Enriched (`DeadlockDetector` & `DeadlockEvent`):**
+   - Added `classification` (`"cooperative_waiting"` vs `"structural_deadlock"`) and `waiting_reason` (`"resource_queue"`, `"bottleneck_yielding"`, `"resource_contention"`, `"doorway_contention"`, `"swap_yielding"`, `"unresolvable_block"`, `"reciprocal_swap_lock"`, `"vertex_contention_lock"`) to `DeadlockEvent`.
+   - In `DeadlockDetector`, integrated spatial and coordinator awareness to distinguish intentional yielding and resource queueing from circular or unyielding physical blocks.
+   - Added query properties: `cooperative_waiting_events`, `structural_deadlock_events`, `cooperative_waiting_count`, `structural_deadlock_count`, `unresolved_structural_deadlocks`, `unresolved_cooperative_waits`, and `waiting_reasons_tally`.
+   - Preserved full backwards compatibility with all existing legacy benchmark assertions and counters (`detected_events`, `recovery_attempts`, `successful_recoveries`, `unresolved_deadlocks`).
+3. **Empirical Verification on U09 & U14:**
+   - Evaluated U09 (Scarce Resource Competition, Seeds 500–519): 100% completion (20/20 episodes, 0 exhaustions). All 167 detected events classified as `cooperative_waiting` (`resource_queue`: 83, `resource_contention`: 84); true `structural_deadlock`: 0.
+   - Evaluated U14 (Multi-Corner Blind Junction, Seeds 500–519): 100% completion (20/20 episodes, 0 exhaustions). All 47 detected events classified as `cooperative_waiting` (`doorway_contention`: 40, `resource_queue`: 7); true `structural_deadlock`: 0.
+   - Confirms that the apparent "deadlocks" reported during the Phase 13.7 audit in U09 and U14 are benign cooperative waiting and yielding that resolve naturally.
+4. **Benchmark & Test Suite Verification:**
+   - Full test suite: **199 passed in 5.40s** (`python -m pytest`), including 9 targeted regression tests in `tests/test_determinism_and_telemetry.py`.
+   - 16-scenario baseline benchmark (`phase14_1_benchmark_results.json`): 100% bit-for-bit identical to Phase 13.7 baseline results, 0 regressions.
+
+## Phase 14.1 checklist
+
+| Requirement | Status |
+| --- | --- |
+| Deterministic agent priority mapping in `ResourceArbitrator` (`agent_val`) | Complete |
+| Elimination of process-dependent `hash()` across entire `worldsim/` codebase | Complete |
+| Subprocess cross-process determinism tests with varying `PYTHONHASHSEED` | Complete |
+| Extended `DeadlockEvent` with `classification` and `waiting_reason` | Complete |
+| Enhanced `DeadlockDetector` distinguishing cooperative waiting from structural deadlock | Complete |
+| Dedicated unit test suite `tests/test_determinism_and_telemetry.py` (9 tests) | Complete |
+| Backwards compatibility with legacy deadlock metrics and assertions | Complete |
+| Telemetry analysis of U09 and U14 confirming 0 true structural deadlocks | Complete |
+| Full 16-scenario baseline benchmark verified without regressions (`phase14_1_benchmark_results.json`) | Complete |
+| Full pytest test suite passing (199 passed) | Complete |
+
 ## Phase 13.6 status
 
 Phase 13.6 implements targeted, minimal, empirical fixes for generalization failures identified in the Phase 13.5 Unseen Scenario Audit, elevating all targeted scenarios to 100% completion while preserving 100% equivalence on the baseline Phase 13.5 16-scenario benchmark:

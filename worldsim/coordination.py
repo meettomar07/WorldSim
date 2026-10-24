@@ -44,6 +44,30 @@ def jains_fairness_index(values: Sequence[float]) -> float:
 
 
 # ==============================================================================
+# Helper: Deterministic Agent Priority Hashing
+# ==============================================================================
+
+def agent_val(aid: str) -> int:
+    """Deterministic integer value for an agent ID for priority ordering.
+
+    Handles numbered IDs (e.g. 'agent_1'), cardinal directions (e.g. 'agent_n', 's'),
+    and arbitrary strings via a deterministic polynomial hash (avoiding Python's
+    randomized process-level hash seed).
+    """
+    digits = "".join(ch for ch in aid if ch.isdigit())
+    if digits:
+        return int(digits)
+    cardinals = {"n": 0, "s": 1, "w": 2, "e": 3, "nw": 0, "ne": 1, "sw": 2, "se": 3}
+    for k, v in cardinals.items():
+        if aid == k or aid.endswith(f"_{k}"):
+            return v
+    h = 0
+    for c in aid:
+        h = (h * 31 + ord(c)) & 0xFFFFFF
+    return h
+
+
+# ==============================================================================
 # Stage 2: Fair, Energy-Aware Resource Allocation
 # ==============================================================================
 
@@ -127,8 +151,8 @@ class ResourceArbitrator:
                 e = agent_energies.get(aid, 0)
                 max_e = agent_max_energies.get(aid, 10)
                 deficit = max_e - e
-                # higher deficit first -> sort by -deficit, then e, then rotated id
-                rot_tie = (hash(aid) + tick) % 1000
+                # higher deficit first -> sort by -deficit, then e, then rotated id deterministically
+                rot_tie = (agent_val(aid) + tick) % 1000
                 return (-deficit, e, rot_tie)
 
             winner = min(claimants, key=urgency_key)
@@ -187,12 +211,15 @@ class DeadlockEvent:
     location: Position
     resolved: bool = False
     recovery_action_applied: str | None = None
+    classification: str = "structural_deadlock"  # "structural_deadlock" or "cooperative_waiting"
+    waiting_reason: str | None = None  # e.g. "resource_queue", "bottleneck_yielding", "circular_wait"
 
 
 class DeadlockDetector:
     """Observable simulation deadlock detector with bounded recovery monitoring.
 
-    Tracks spatial progress, repeated collisions, and position cycling across agents.
+    Tracks spatial progress, repeated collisions, and position cycling across agents,
+    distinguishing between benign cooperative waiting and true structural deadlocks.
     """
 
     def __init__(self, persistence_threshold: int = 2) -> None:
@@ -209,6 +236,49 @@ class DeadlockDetector:
         self.swap_history: deque[tuple[str, str, Position, Position]] = deque(maxlen=10)
         self.vertex_history: dict[Position, deque[tuple[int, tuple[str, ...]]]] = {}
 
+    @property
+    def cooperative_waiting_events(self) -> list[DeadlockEvent]:
+        """Events classified as benign cooperative waiting (queueing or yielding)."""
+        return [ev for ev in self.detected_events if ev.classification == "cooperative_waiting"]
+
+    @property
+    def structural_deadlock_events(self) -> list[DeadlockEvent]:
+        """Events classified as true structural deadlocks (circular wait or unyielding lock)."""
+        return [ev for ev in self.detected_events if ev.classification == "structural_deadlock"]
+
+    @property
+    def cooperative_waiting_count(self) -> int:
+        return len(self.cooperative_waiting_events)
+
+    @property
+    def structural_deadlock_count(self) -> int:
+        return len(self.structural_deadlock_events)
+
+    @property
+    def unresolved_structural_deadlocks(self) -> int:
+        """Count of active unresolved events that are true structural deadlocks."""
+        return sum(
+            1 for idx in self._unresolved_event_indices
+            if idx < len(self.detected_events) and self.detected_events[idx].classification == "structural_deadlock"
+        )
+
+    @property
+    def unresolved_cooperative_waits(self) -> int:
+        """Count of active unresolved events that are cooperative waits."""
+        return sum(
+            1 for idx in self._unresolved_event_indices
+            if idx < len(self.detected_events) and self.detected_events[idx].classification == "cooperative_waiting"
+        )
+
+    @property
+    def waiting_reasons_tally(self) -> dict[str, int]:
+        """Distribution of waiting reasons across all detected events."""
+        tally: dict[str, int] = {}
+        for ev in self.detected_events:
+            reason = ev.waiting_reason or "unknown"
+            tally[reason] = tally.get(reason, 0) + 1
+        return tally
+
     def update_tick(
         self,
         tick: int,
@@ -216,6 +286,8 @@ class DeadlockDetector:
         intents: dict[str, tuple[Action, Position]],
         collisions: dict[str, str | None],
         moved_flags: dict[str, bool],
+        coordinator: Any | None = None,
+        resources: Sequence[Position] | Sequence[Resource] | None = None,
     ) -> list[DeadlockEvent]:
         """Analyze current tick outcomes and detect new or ongoing deadlocks."""
         # 0. Check if any previously unresolved deadlocks have now moved and recovered
@@ -227,6 +299,48 @@ class DeadlockDetector:
                 resolved_indices.add(idx)
         self._unresolved_event_indices -= resolved_indices
         self.unresolved_deadlocks = len(self._unresolved_event_indices)
+
+        resource_set: set[Position] = set()
+        if resources is not None:
+            for r in resources:
+                if isinstance(r, Position):
+                    resource_set.add(r)
+                elif hasattr(r, "position"):
+                    resource_set.add(r.position)
+        if coordinator is not None:
+            if hasattr(coordinator, "resource_commitments"):
+                resource_set.update(coordinator.resource_commitments.values())
+            if hasattr(coordinator, "resource_reservations"):
+                resource_set.update(coordinator.resource_reservations.keys())
+
+        def classify_occupied(aid: str, dest: Position) -> tuple[str, str]:
+            if dest in resource_set or any(abs(dest.x - r.x) + abs(dest.y - r.y) <= 1 for r in resource_set):
+                return ("cooperative_waiting", "resource_queue")
+            if coordinator is not None and coordinator.resource_commitments.get(aid) in resource_set:
+                return ("cooperative_waiting", "resource_queue")
+            occupant = next((oid for oid, opos in agent_positions.items() if opos == dest and oid != aid), None)
+            if occupant is not None:
+                occ_intent_dest = intents.get(occupant, (None, None))[1]
+                if moved_flags.get(occupant, False) or (occ_intent_dest is not None and occ_intent_dest != dest):
+                    return ("cooperative_waiting", "bottleneck_yielding")
+                if coordinator is not None and coordinator.agent_intentions.get(occupant) not in (None, dest):
+                    return ("cooperative_waiting", "bottleneck_yielding")
+                if coordinator is not None:
+                    return ("cooperative_waiting", "bottleneck_yielding")
+                return ("structural_deadlock", "unresolvable_block")
+            return ("structural_deadlock", "unresolvable_block")
+
+        def classify_swap(a1: str, a2: str, loc: Position) -> tuple[str, str]:
+            if coordinator is not None:
+                return ("cooperative_waiting", "swap_yielding")
+            return ("structural_deadlock", "reciprocal_swap_lock")
+
+        def classify_vertex(aid: str, dest: Position) -> tuple[str, str]:
+            if dest in resource_set or any(abs(dest.x - r.x) + abs(dest.y - r.y) <= 1 for r in resource_set):
+                return ("cooperative_waiting", "resource_contention")
+            if coordinator is not None:
+                return ("cooperative_waiting", "doorway_contention")
+            return ("structural_deadlock", "vertex_contention_lock")
 
         new_events: list[DeadlockEvent] = []
 
@@ -243,11 +357,14 @@ class DeadlockDetector:
             if count >= self.persistence_threshold and collisions.get(aid) == "occupied":
                 pos = agent_positions[aid]
                 dest = intents[aid][1]
+                classification, reason = classify_occupied(aid, dest)
                 event = DeadlockEvent(
                     tick=tick,
                     deadlock_type="occupied_blocking",
                     affected_agents=(aid,),
                     location=dest,
+                    classification=classification,
+                    waiting_reason=reason,
                 )
                 new_events.append(event)
                 self.detected_events.append(event)
@@ -264,11 +381,14 @@ class DeadlockDetector:
                         # Recorded swap
                         recent_swaps = [s for s in self.swap_history if (s[0] == a1 and s[1] == a2) or (s[0] == a2 and s[1] == a1)]
                         if len(recent_swaps) >= 1:
+                            classification, reason = classify_swap(a1, a2, p1)
                             event = DeadlockEvent(
                                 tick=tick,
                                 deadlock_type="repeated_swap",
                                 affected_agents=(a1, a2),
                                 location=p1,
+                                classification=classification,
+                                waiting_reason=reason,
                             )
                             new_events.append(event)
                             self.detected_events.append(event)
@@ -282,11 +402,14 @@ class DeadlockDetector:
                 v_queue.append((tick, (aid,)))
                 recent_v = [v for v in v_queue if tick - v[0] <= 2]
                 if len(recent_v) >= self.persistence_threshold:
+                    classification, reason = classify_vertex(aid, dest)
                     event = DeadlockEvent(
                         tick=tick,
                         deadlock_type="vertex_deadlock",
                         affected_agents=(aid,),
                         location=dest,
+                        classification=classification,
+                        waiting_reason=reason,
                     )
                     new_events.append(event)
                     self.detected_events.append(event)
@@ -305,30 +428,6 @@ class DeadlockDetector:
             self.successful_recoveries += 1
         else:
             self.unresolved_deadlocks += 1
-
-
-# ==============================================================================
-# Helper: Deterministic Agent Priority Hashing
-# ==============================================================================
-
-def agent_val(aid: str) -> int:
-    """Deterministic integer value for an agent ID for priority ordering.
-
-    Handles numbered IDs (e.g. 'agent_1'), cardinal directions (e.g. 'agent_n', 's'),
-    and arbitrary strings via a deterministic polynomial hash (avoiding Python's
-    randomized process-level hash seed).
-    """
-    digits = "".join(ch for ch in aid if ch.isdigit())
-    if digits:
-        return int(digits)
-    cardinals = {"n": 0, "s": 1, "w": 2, "e": 3, "nw": 0, "ne": 1, "sw": 2, "se": 3}
-    for k, v in cardinals.items():
-        if aid == k or aid.endswith(f"_{k}"):
-            return v
-    h = 0
-    for c in aid:
-        h = (h * 31 + ord(c)) & 0xFFFFFF
-    return h
 
 
 # ==============================================================================

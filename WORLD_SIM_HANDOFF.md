@@ -1,5 +1,34 @@
 # WorldSim Handoff
 
+## Latest update: Phase 14.1
+
+Phase 14.1 (Determinism & Telemetry Cleanup) completes the foundational cleanup of the multi-agent coordination layer before decentralized learning:
+- **Core Targeted Improvements:**
+  1. *Deterministic Agent Priority Tie-Breaking:*
+     - Replaced Python's process-dependent `hash(aid)` tie-breaker under the `need_urgency` rule in `ResourceArbitrator` (`worldsim/coordination.py`) with the stable, deterministic `agent_val(aid)` mapping.
+     - Verified zero occurrences of built-in `hash()` across the entire `worldsim/` codebase.
+     - Regression tests verify identical tie-breaking behavior across separate processes running with different `PYTHONHASHSEED` values (`0`, `999999`, `random`).
+  2. *Deadlock Telemetry & Classification Enriched:*
+     - Enhanced `DeadlockEvent` with `classification` (`"cooperative_waiting"` vs `"structural_deadlock"`) and `waiting_reason` (`"resource_queue"`, `"bottleneck_yielding"`, `"resource_contention"`, `"doorway_contention"`, `"swap_yielding"`, `"unresolvable_block"`, `"reciprocal_swap_lock"`, `"vertex_contention_lock"`).
+     - Enhanced `DeadlockDetector` to classify events based on coordinator state, resource proximity, and unresolvable physical blocks.
+     - Added convenience properties: `cooperative_waiting_events`, `structural_deadlock_events`, `cooperative_waiting_count`, `structural_deadlock_count`, `unresolved_structural_deadlocks`, `unresolved_cooperative_waits`, and `waiting_reasons_tally`.
+     - Preserved full backwards compatibility with all existing legacy benchmark assertions and counters (`detected_events`, `recovery_attempts`, `successful_recoveries`, `unresolved_deadlocks`).
+  3. *Telemetry Analysis on U09 and U14:*
+     - In U09 (Scarce Resource Competition, Seeds 500–519): 100% completion (20/20 episodes, 0 exhaustions). All 167 detected events classified as `cooperative_waiting` (`resource_queue`: 83, `resource_contention`: 84); true `structural_deadlock`: 0.
+     - In U14 (Multi-Corner Blind Junction, Seeds 500–519): 100% completion (20/20 episodes, 0 exhaustions). All 47 detected events classified as `cooperative_waiting` (`doorway_contention`: 40, `resource_queue`: 7); true `structural_deadlock`: 0.
+     - Confirms that the apparent "deadlocks" reported during the Phase 13.7 audit in U09 and U14 are benign cooperative waiting and yielding that resolve naturally.
+- **Benchmark & Test Suite Verification:**
+  - Full test suite: **199 passed in 5.40s** (`python -m pytest`), including 9 targeted regression tests in `tests/test_determinism_and_telemetry.py`.
+  - 16-scenario baseline benchmark (`phase14_1_benchmark_results.json`): 100% bit-for-bit identical to Phase 13.7 baseline results, 0 regressions.
+
+Files changed / added:
+- `worldsim/coordination.py` (updated: deterministic tie-breaking via `agent_val`, enriched `DeadlockEvent` and `DeadlockDetector`)
+- `worldsim/multi_agent.py` (updated: passed `coordinator` and `resources` into `deadlock_detector.update_tick`)
+- `tests/test_determinism_and_telemetry.py` (new test suite: 9 tests for determinism and telemetry classification)
+- `phase14_1_benchmark_results.json` (new artifact: reproducible 16-scenario baseline validation)
+- `WORLD_SIM_PLAN.md` (updated)
+- `WORLD_SIM_HANDOFF.md` (updated)
+
 ## Latest update: Phase 13.6
 
 Phase 13.6 resolves generalization failures identified during the Phase 13.5 Unseen Scenario Audit:
