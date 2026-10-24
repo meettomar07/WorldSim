@@ -23,6 +23,14 @@ from .dynamic_obstacles import (
     predict_next_obstacle_state,
     predict_obstacle_trajectory,
 )
+from .decentralized_learning import (
+    DecentralizedFeatureExtractor,
+    DecentralizedLearningConfig,
+    DecentralizedQLearner,
+    DecentralizedRewardEngine,
+    LearnedCoordinationPolicy,
+    train_decentralized_coordination,
+)
 from .models import Entity, Observation, Position, Resource, StepResult, WorldState
 from .multi_agent import (
     AgentConfig,
@@ -75,6 +83,10 @@ __all__ = [
     "CycleDetector",
     "DeadlockDetector",
     "DeadlockEvent",
+    "DecentralizedFeatureExtractor",
+    "DecentralizedLearningConfig",
+    "DecentralizedQLearner",
+    "DecentralizedRewardEngine",
     "DynamicObstacleConfig",
     "DynamicObstacleState",
     "EnergyAwarePolicy",
@@ -93,6 +105,7 @@ __all__ = [
     "FeatureExtractor",
     "LearningConfig",
     "LearningRunner",
+    "LearnedCoordinationPolicy",
     "LinearLearningConfig",
     "LinearLearningRunner",
     "LinearQLearner",
@@ -135,6 +148,7 @@ __all__ = [
     "run_experiment",
     "run_multi_agent_episode",
     "run_policy_experiment",
+    "train_decentralized_coordination",
 ]
 
 

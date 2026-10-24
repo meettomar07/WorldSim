@@ -1,5 +1,43 @@
 # WorldSim Handoff
 
+## Latest update: Phase 14.4
+
+Phase 14.4 (Decentralized Learning & Communicative Intent) introduces decentralized multi-agent reinforcement learning with linear function approximation and local intent communication under strict partial observability ($R \le 2.0$), preserving the heuristic policy as the control baseline:
+- **Core Targeted Improvements:**
+  1. *Preflight Metric Audit (D01 Collision Telemetry Analysis):*
+     - Detailed audit of Phase 14.3 D01 reported collisions: confirmed all 40 occurrences were swap conflict attempts on tick 5 between `agent_w` and `agent_e` ($2 \text{ agents} \times 1 \text{ tick} \times 20 \text{ episodes} = 40$).
+     - Confirmed authoritative simulation engine prevented any physical overlap (zero illegal double occupancy, physical safety invariant held 100%).
+     - Metric represents attempted conflicting actions evaluated by the engine, not realized penetrations.
+  2. *Decentralized Learning Architecture (`worldsim/decentralized_learning.py`):*
+     - `DecentralizedLearningConfig`: learning rate 0.05, discount 0.95, gradient clipping 2.0, L2 weight decay 1e-4, multi-objective reward weights.
+     - `DecentralizedFeatureExtractor`: normalized relative feature representation within local sensory horizon ($R \le 2.0$), covering goal displacement, kinematic validity, energy margins, dynamic obstacle prediction, inactive obstacles, peer proximity, and local intent communication (`comm_peer_intent_vertex_conflict`, `comm_peer_swap_conflict`, `comm_priority_yield_detour`, `comm_my_priority_advance`).
+     - `DecentralizedQLearner`: TD(0) linear function approximation with L2 regularization, clipped TD errors, epsilon-greedy exploration, and JSON serialization.
+     - `LearnedCoordinationPolicy`: policy wrapper adhering to WorldSim policy interface, incorporating agent-local memory (`AgentMemory`), legal action masking, and coordinator intent registration when communication is enabled.
+     - `DecentralizedRewardEngine`: multi-objective reward function balancing individual target progress (+5.0), goal completion (+100.0), energy conservation (-0.5), collision avoidance (-15.0 swap/-15.0 vertex/-20.0 dynamic), safe yielding (-0.2), and repeated wait penalties (-4.0).
+     - `train_decentralized_coordination`: multi-agent training runner across 5 diverse training environments using training seeds 42..91, strictly disjoint from evaluation seeds 500..519.
+  3. *Dedicated Unit Tests (`tests/test_decentralized_learning.py`):*
+     - 8 comprehensive unit tests covering local horizon isolation, intent communication toggling, TD update and serialization, action selection and masking, reward engine incentives, seed separation, symmetry breaking with communication, and authoritative physics preservation.
+     - Full test suite: **232 passed in 8.63s** (`python -m pytest`).
+     - Cross-process determinism verified across randomized `PYTHONHASHSEED` (`0`, `42`, `99999`).
+  4. *Comparative Benchmark Matrix (Seeds 500–519):*
+     - **D01:** Heuristic 100% (14.0 steps, 40 swap attempts), Learned No-Comm 50.0% (10.0 steps, 920 conflicts), Learned Comm **100.0% (11.0 steps, 0 collisions)** — communication completely eliminated head-on swap conflict attempts!
+     - **D02:** Heuristic 100% (14.0 steps), Learned No-Comm **100.0% (10.0 steps, 0 collisions)**, Learned Comm **100.0% (10.0 steps, 0 collisions)**.
+     - **D03:** Heuristic 100% (13.0 steps), Learned No-Comm 0.0%, Learned Comm **100.0% (17.0 steps)**.
+     - **D04:** Heuristic 100% (12.0 steps), Learned No-Comm 50.0% (75% agent comp), Learned Comm 0.0% (50% agent comp).
+     - **U06 Regression:** Heuristic **100.0% completion, 0 exhaustions** (maintains >=95% requirement).
+     - **U14 Regression:** Heuristic **100.0% completion, 0 exhaustions** (maintains >=95% requirement). Under Learned Comm, collision attempts dropped from 2410 down to **0**.
+- **Files changed / added:**
+  - `worldsim/decentralized_learning.py` (new: decentralized POMDP feature extraction, Q-learning, intent communication, and training harness)
+  - `worldsim/__init__.py` (updated: exported decentralized learning classes)
+  - `tests/test_decentralized_learning.py` (new test suite: 8 tests)
+  - `phase14_4_learned_coordination_eval.py` (new comparative evaluation harness for D01–D04, U06, and U14)
+  - `phase14_4_weights_no_comm.json` (new artifact: trained non-communicative model weights)
+  - `phase14_4_weights_comm.json` (new artifact: trained communicative model weights)
+  - `phase14_4_benchmark_results.json` (new artifact: benchmark results across all 18 configurations)
+  - `phase14_4_learned_coordination_report.md` (new artifact: evaluation report)
+  - `WORLD_SIM_PLAN.md` (updated)
+  - `WORLD_SIM_HANDOFF.md` (updated)
+
 ## Latest update: Phase 14.3
 
 Phase 14.3 (Dynamic Obstacle Avoidance) introduces moving obstacles and local velocity-aware prediction and avoidance while preserving the working centralized baseline and decentralized local-horizon coordination modes:

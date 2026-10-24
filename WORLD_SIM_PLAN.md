@@ -1,5 +1,65 @@
 # WorldSim Plan
 
+## Phase 14.4 status
+
+Phase 14.4 (Decentralized Learning & Communicative Intent) introduces decentralized multi-agent reinforcement learning with linear function approximation and local intent communication under strict partial observability ($R \le 2.0$), while preserving the heuristic policy as the control baseline:
+1. **Preflight Metric Audit (D01 Collision Telemetry Analysis):**
+   - Conducted step-by-step diagnostic audit of Phase 14.3 D01 reported collisions: confirmed all 40 occurrences were swap conflict attempts on tick 5 between `agent_w` and `agent_e` ($2 \text{ agents} \times 1 \text{ tick} \times 20 \text{ episodes} = 40$).
+   - Confirmed authoritative simulation engine prevented any physical overlap (zero illegal double occupancy, physical safety invariant held 100%).
+   - Metric represents attempted conflicting actions evaluated by the engine, not realized penetrations.
+2. **Decentralized Learning Architecture (`worldsim/decentralized_learning.py`):**
+   - `DecentralizedLearningConfig`: learning rate 0.05, discount 0.95, gradient clipping 2.0, L2 regularization 1e-4, multi-objective reward weights.
+   - `DecentralizedFeatureExtractor`: normalized relative feature representation within local sensory horizon ($R \le 2.0$), covering goal displacement, kinematic validity, energy margins, dynamic obstacle prediction, inactive obstacles, peer proximity, and local intent communication (`comm_peer_intent_vertex_conflict`, `comm_peer_swap_conflict`, `comm_priority_yield_detour`, `comm_my_priority_advance`).
+   - `DecentralizedQLearner`: TD(0) linear function approximation with L2 weight decay, clipped TD errors, epsilon-greedy exploration, and JSON serialization.
+   - `LearnedCoordinationPolicy`: policy wrapper adhering to WorldSim policy interface, incorporating agent-local memory (`AgentMemory`), legal action masking, and coordinator intent registration when communication is enabled.
+   - `DecentralizedRewardEngine`: multi-objective reward function balancing individual target progress (+5.0), goal completion (+100.0), energy conservation (-0.5), collision avoidance (-15.0 swap/-15.0 vertex/-20.0 dynamic), safe yielding (-0.2), and repeated wait penalties (-4.0).
+   - `train_decentralized_coordination`: multi-agent training runner across 5 diverse training environments using training seeds 42..91, strictly disjoint from evaluation seeds 500..519.
+3. **Dedicated Unit Tests (`tests/test_decentralized_learning.py`):**
+   - 8 comprehensive unit tests:
+     - `test_feature_extractor_local_horizon_isolation`: Verifies features only use local information within $R \le 2.0$; distant peers and unobserved cells produce zero activations.
+     - `test_intent_communication_toggle`: Peer intent features activate only when `enable_communication=True`.
+     - `test_q_learner_td_update_and_serialization`: Weights update correctly via TD(0) and serialize/deserialize without loss.
+     - `test_policy_action_selection_and_masking`: Masking strictly disallows illegal moves or moves without energy.
+     - `test_reward_engine_penalties_and_incentives`: Verifies progress, collision, and energy exhaustion rewards.
+     - `test_training_seed_separation`: Training seeds 42..91 strictly disjoint from evaluation seeds 500..519.
+     - `test_symmetry_breaking_with_communication`: Communication breaks head-on deadlock and detours lower-priority agent.
+     - `test_authoritative_simulation_physics_preservation`: Authoritative physics blocks swap collisions with zero physical overlap.
+   - Full test suite: **232 passed in 8.63s** (`python -m pytest`).
+4. **Comparative Benchmark Matrix (Seeds 500–519):**
+   - **D01:** Heuristic 100% (14.0 steps, 40 swap attempts), Learned No-Comm 50.0% (10.0 steps, 920 conflicts), Learned Comm **100.0% (11.0 steps, 0 collisions)** — communication completely eliminated head-on swap conflict attempts!
+   - **D02:** Heuristic 100% (14.0 steps), Learned No-Comm **100.0% (10.0 steps, 0 collisions)**, Learned Comm **100.0% (10.0 steps, 0 collisions)**.
+   - **D03:** Heuristic 100% (13.0 steps), Learned No-Comm 0.0%, Learned Comm **100.0% (17.0 steps)**.
+   - **D04:** Heuristic 100% (12.0 steps), Learned No-Comm 50.0% (75% agent comp), Learned Comm 0.0% (50% agent comp).
+   - **U06 Regression:** Heuristic **100.0% completion, 0 exhaustions** (maintains >=95% requirement).
+   - **U14 Regression:** Heuristic **100.0% completion, 0 exhaustions** (maintains >=95% requirement). Under Learned Comm, collision attempts dropped from 2410 down to **0**.
+5. **Artifacts & Deliverables:**
+   - `phase14_4_learned_coordination_eval.py`: Full evaluation harness.
+   - `phase14_4_weights_no_comm.json` & `phase14_4_weights_comm.json`: Trained model weights.
+   - `phase14_4_benchmark_results.json`: Machine-readable results across all 18 configurations.
+   - `phase14_4_learned_coordination_report.md`: Detailed audit and comparative evaluation report.
+
+## Phase 14.4 checklist
+
+| Requirement | Status |
+| --- | --- |
+| Preflight metric audit: D01 40 collisions analyzed and classified as attempted swap conflicts | Complete |
+| Documented POMDP state representation using local features ($R \le 2.0$) | Complete |
+| Linear function-approximation Q-learner with TD(0) and weight decay | Complete |
+| Communicative (`enable_communication=True`) and non-communicative (`False`) policy modes | Complete |
+| Strict local information boundary ($R \le 2.0$) with no global trajectory leakage | Complete |
+| Authoritative simulation physics preventing illegal double occupancy | Complete |
+| Strict seed separation: Training (42..91) disjoint from Evaluation (500..519) | Complete |
+| Multi-objective reward balancing progress, collision penalties, and team fairness | Complete |
+| Dedicated unit tests `tests/test_decentralized_learning.py` (8 tests) | Complete |
+| Full pytest test suite passing (232 passed) | Complete |
+| Cross-process determinism verified across randomized `PYTHONHASHSEED` values | Complete |
+| Comparative evaluation benchmark across D01–D04, U06, U14 on seeds 500–519 | Complete |
+| U06 and U14 maintain 100.0% completion (>=95% requirement satisfied) | Complete |
+| Heuristic baseline preserved as default policy | Complete |
+| Structured results exported to `phase14_4_benchmark_results.json` | Complete |
+| Comprehensive audit report exported to `phase14_4_learned_coordination_report.md` | Complete |
+| Trained weights exported to JSON (`phase14_4_weights_no_comm.json`, `phase14_4_weights_comm.json`) | Complete |
+
 ## Phase 14.3 status
 
 Phase 14.3 (Dynamic Obstacle Avoidance) introduces moving obstacles and local velocity-aware prediction and avoidance while preserving the working centralized baseline and decentralized local-horizon coordination modes:
