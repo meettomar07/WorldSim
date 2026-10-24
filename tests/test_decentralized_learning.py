@@ -10,6 +10,7 @@ from worldsim.decentralized_learning import (
     DecentralizedLearningConfig,
     DecentralizedQLearner,
     DecentralizedRewardEngine,
+    HybridCoordinationPolicy,
     LearnedCoordinationPolicy,
     train_decentralized_coordination,
 )
@@ -184,6 +185,334 @@ class TestDecentralizedLearning(unittest.TestCase):
         # Under greedy=True, Action.RIGHT (which reaches goal) MUST be selected regardless of epsilon=1.0
         chosen_greedy = pol.choose_action(obs, greedy=True)
         self.assertEqual(chosen_greedy, Action.RIGHT)
+
+    def test_remediated_policy_d04_recharge_contention(self) -> None:
+        """9. Verify remediated learned policy completes D04 with zero exhaustions."""
+        from phase14_3_dynamic_obstacle_eval import build_controlled_dynamic_scenarios
+
+        scen_d04 = build_controlled_dynamic_scenarios()[3]
+        learner = DecentralizedQLearner()
+        weights_path = Path("phase14_4_weights_comm.json")
+        if weights_path.exists():
+            learner.load_weights(weights_path)
+
+        aids = [a.id for a in scen_d04["agents"]]
+        for seed in (500, 501):
+            w_cfg = MultiAgentWorldConfig(
+                width=scen_d04["width"],
+                height=scen_d04["height"],
+                agents=scen_d04["agents"],
+                resources=scen_d04["resources"],
+                dynamic_obstacles=scen_d04["dynamic_obstacles"],
+                max_energy=10,
+                enable_coordination=True,
+                coordination_mode="decentralized",
+                communication_radius=2.0,
+                sensory_radius=2.0,
+                collision_rule="priority_rotation",
+            )
+            sim = MultiAgentSimulation(w_cfg, seed=seed)
+            pols = {
+                aid: LearnedCoordinationPolicy(
+                    scen_d04["width"],
+                    scen_d04["height"],
+                    10,
+                    2.0,
+                    learner=learner,
+                    enable_communication=True,
+                    coordinator=sim.coordinator,
+                    enable_safety_guard=True,
+                )
+                for aid in aids
+            }
+            for _ in range(40):
+                if all(not sim.state.agents[aid].active for aid in aids):
+                    break
+                if sim.coordinator:
+                    sim.coordinator.reset_tick()
+                acts = {
+                    aid: pols[aid].choose_action(sim.observe_agent(aid))
+                    if sim.state.agents[aid].active
+                    else Action.UP
+                    for aid in aids
+                }
+                res = sim.step(acts)
+                for aid in aids:
+                    r = res.agent_results[aid]
+                    pols[aid].record_action_result(r.position_after, r.energy_after, r.action, r.success)
+
+            for aid in aids:
+                self.assertNotEqual(sim.state.agents[aid].status, "exhausted", f"Agent {aid} exhausted on seed {seed}")
+                self.assertEqual(sim.state.agents[aid].status, "reached_target", f"Agent {aid} failed to reach target on seed {seed}")
+
+    def test_remediated_policy_u06_quadrant_mesh(self) -> None:
+        """10. Verify remediated learned policy completes U06 quadrant mesh with zero exhaustions."""
+        from phase13_5_unseen_audit import build_all_unseen_scenarios
+
+        unseen = {s[0].scenario_id: s for s in build_all_unseen_scenarios()}
+        u06_spec, _ = unseen["U06"]
+        u06_agents = [
+            AgentConfig(
+                id=a["id"],
+                initial_x=a["initial_x"],
+                initial_y=a["initial_y"],
+                initial_energy=a["initial_energy"],
+                target=Position(a["target_x"], a["target_y"]),
+            )
+            for a in u06_spec.active_agents
+        ]
+        u06_res = tuple(
+            Resource(Position(r["x"], r["y"]), recharge_amount=r["recharge_amount"], consumable=r["consumable"])
+            for r in u06_spec.resources
+        )
+        aids = [a["id"] for a in u06_spec.active_agents]
+
+        learner = DecentralizedQLearner()
+        weights_path = Path("phase14_4_weights_comm.json")
+        if weights_path.exists():
+            learner.load_weights(weights_path)
+
+        for seed in (500, 501):
+            w_cfg = MultiAgentWorldConfig(
+                width=u06_spec.width,
+                height=u06_spec.height,
+                agents=tuple(u06_agents),
+                resources=u06_res,
+                max_energy=10,
+                enable_coordination=True,
+                coordination_mode="decentralized",
+                communication_radius=2.0,
+                sensory_radius=2.0,
+                collision_rule="priority_rotation",
+            )
+            sim = MultiAgentSimulation(w_cfg, seed=seed)
+            pols = {
+                aid: LearnedCoordinationPolicy(
+                    u06_spec.width,
+                    u06_spec.height,
+                    10,
+                    2.0,
+                    learner=learner,
+                    enable_communication=True,
+                    coordinator=sim.coordinator,
+                    enable_safety_guard=True,
+                )
+                for aid in aids
+            }
+            for _ in range(40):
+                if all(not sim.state.agents[aid].active for aid in aids):
+                    break
+                if sim.coordinator:
+                    sim.coordinator.reset_tick()
+                acts = {
+                    aid: pols[aid].choose_action(sim.observe_agent(aid))
+                    if sim.state.agents[aid].active
+                    else Action.UP
+                    for aid in aids
+                }
+                res = sim.step(acts)
+                for aid in aids:
+                    r = res.agent_results[aid]
+                    pols[aid].record_action_result(r.position_after, r.energy_after, r.action, r.success)
+
+            for aid in aids:
+                self.assertNotEqual(sim.state.agents[aid].status, "exhausted", f"Agent {aid} exhausted on seed {seed}")
+                self.assertEqual(sim.state.agents[aid].status, "reached_target", f"Agent {aid} failed to reach target on seed {seed}")
+
+    def test_hybrid_policy_u14_blind_intersection(self) -> None:
+        """11. Verify hybrid coordination policy completes U14 blind intersection with zero exhaustions."""
+        from phase13_5_unseen_audit import build_all_unseen_scenarios
+
+        unseen = {s[0].scenario_id: s for s in build_all_unseen_scenarios()}
+        u14_spec, u14_pre = unseen["U14"]
+        u14_agents = [
+            AgentConfig(
+                id=a["id"],
+                initial_x=a["initial_x"],
+                initial_y=a["initial_y"],
+                initial_energy=a["initial_energy"],
+                target=Position(a["target_x"], a["target_y"]),
+            )
+            for a in u14_spec.active_agents
+        ] + [
+            AgentConfig(id=p.id, initial_x=p.x, initial_y=p.y, initial_energy=0, target=None)
+            for p in u14_pre
+        ]
+        aids = [a["id"] for a in u14_spec.active_agents]
+
+        learner = DecentralizedQLearner()
+        weights_path = Path("phase14_4_weights_comm.json")
+        if weights_path.exists():
+            learner.load_weights(weights_path)
+
+        for seed in (500, 501):
+            w_cfg = MultiAgentWorldConfig(
+                width=u14_spec.width,
+                height=u14_spec.height,
+                agents=tuple(u14_agents),
+                resources=(),
+                max_energy=10,
+                enable_coordination=True,
+                coordination_mode="decentralized",
+                communication_radius=2.0,
+                sensory_radius=2.0,
+                collision_rule="priority_rotation",
+            )
+            sim = MultiAgentSimulation(w_cfg, seed=seed)
+            pols = {
+                aid: HybridCoordinationPolicy(
+                    u14_spec.width,
+                    u14_spec.height,
+                    10,
+                    2.0,
+                    learner=learner,
+                    enable_communication=True,
+                    coordinator=sim.coordinator,
+                )
+                for aid in aids
+            }
+            for _ in range(40):
+                if all(not sim.state.agents[aid].active for aid in aids):
+                    break
+                if sim.coordinator:
+                    sim.coordinator.reset_tick()
+                acts = {
+                    aid: pols[aid].choose_action(sim.observe_agent(aid))
+                    if sim.state.agents[aid].active
+                    else Action.UP
+                    for aid in aids
+                }
+                res = sim.step(acts)
+                for aid in aids:
+                    r = res.agent_results[aid]
+                    pols[aid].record_action_result(r.position_after, r.energy_after, r.action, r.success)
+
+            for aid in aids:
+                self.assertNotEqual(sim.state.agents[aid].status, "exhausted", f"Agent {aid} exhausted on seed {seed}")
+                self.assertEqual(sim.state.agents[aid].status, "reached_target", f"Agent {aid} failed to reach target on seed {seed}")
+
+    def test_hybrid_policy_d03_deadlock_reduction(self) -> None:
+        """12. Verify hybrid coordination policy reduces deadlocks and blocked attempts in D03."""
+        from phase14_3_dynamic_obstacle_eval import build_controlled_dynamic_scenarios
+
+        scen_d03 = build_controlled_dynamic_scenarios()[2]
+        learner = DecentralizedQLearner()
+        weights_path = Path("phase14_4_weights_comm.json")
+        if weights_path.exists():
+            learner.load_weights(weights_path)
+
+        aids = [a.id for a in scen_d03["agents"]]
+        w_cfg = MultiAgentWorldConfig(
+            width=scen_d03["width"],
+            height=scen_d03["height"],
+            agents=scen_d03["agents"],
+            dynamic_obstacles=scen_d03["dynamic_obstacles"],
+            max_energy=16,
+            enable_coordination=True,
+            coordination_mode="decentralized",
+            communication_radius=2.0,
+            sensory_radius=2.0,
+            collision_rule="priority_rotation",
+        )
+        sim = MultiAgentSimulation(w_cfg, seed=500)
+        pols = {
+            aid: HybridCoordinationPolicy(
+                scen_d03["width"],
+                scen_d03["height"],
+                16,
+                2.0,
+                learner=learner,
+                enable_communication=True,
+                coordinator=sim.coordinator,
+            )
+            for aid in aids
+        }
+        total_deadlocks = 0
+        total_blocked = 0
+        for _ in range(50):
+            if all(not sim.state.agents[aid].active for aid in aids):
+                break
+            if sim.coordinator:
+                sim.coordinator.reset_tick()
+            acts = {
+                aid: pols[aid].choose_action(sim.observe_agent(aid))
+                if sim.state.agents[aid].active
+                else Action.UP
+                for aid in aids
+            }
+            res = sim.step(acts)
+            total_deadlocks += len(res.deadlock_events)
+            total_blocked += res.occupied_collisions
+            for aid in aids:
+                r = res.agent_results[aid]
+                pols[aid].record_action_result(r.position_after, r.energy_after, r.action, r.success)
+
+        # Raw learned policy had 5-10 deadlocks and 8-15 blocked per episode in D03
+        self.assertLessEqual(total_deadlocks, 2, f"Deadlocks ({total_deadlocks}) should be minimal")
+        self.assertLessEqual(total_blocked, 5, f"Blocked attempts ({total_blocked}) should be minimal")
+        for aid in aids:
+            self.assertEqual(sim.state.agents[aid].status, "reached_target")
+
+    def test_transparent_controller_decision_tracking(self) -> None:
+        """13. Verify transparent logging and reporting of learned vs safety_guard decision counts."""
+        from phase14_3_dynamic_obstacle_eval import build_controlled_dynamic_scenarios
+
+        scen_d04 = build_controlled_dynamic_scenarios()[3]
+        learner = DecentralizedQLearner()
+        weights_path = Path("phase14_4_weights_comm.json")
+        if weights_path.exists():
+            learner.load_weights(weights_path)
+
+        aids = [a.id for a in scen_d04["agents"]]
+        w_cfg = MultiAgentWorldConfig(
+            width=scen_d04["width"],
+            height=scen_d04["height"],
+            agents=scen_d04["agents"],
+            resources=scen_d04["resources"],
+            dynamic_obstacles=scen_d04["dynamic_obstacles"],
+            max_energy=10,
+            enable_coordination=True,
+            coordination_mode="decentralized",
+            communication_radius=2.0,
+            sensory_radius=2.0,
+            collision_rule="priority_rotation",
+        )
+        sim = MultiAgentSimulation(w_cfg, seed=500)
+        pols = {
+            aid: HybridCoordinationPolicy(
+                scen_d04["width"],
+                scen_d04["height"],
+                10,
+                2.0,
+                learner=learner,
+                enable_communication=True,
+                coordinator=sim.coordinator,
+            )
+            for aid in aids
+        }
+        for _ in range(30):
+            if all(not sim.state.agents[aid].active for aid in aids):
+                break
+            if sim.coordinator:
+                sim.coordinator.reset_tick()
+            acts = {
+                aid: pols[aid].choose_action(sim.observe_agent(aid))
+                if sim.state.agents[aid].active
+                else Action.UP
+                for aid in aids
+            }
+            res = sim.step(acts)
+            for aid in aids:
+                r = res.agent_results[aid]
+                pols[aid].record_action_result(r.position_after, r.energy_after, r.action, r.success)
+
+        # Check decision count telemetry
+        for aid in aids:
+            counts = pols[aid].decision_counts
+            self.assertIn("learned", counts)
+            self.assertIn("safety_guard", counts)
+            self.assertGreater(counts["learned"] + counts["safety_guard"], 0)
+            self.assertIn(pols[aid].last_decision_mode, ("learned", "safety_guard"))
 
 
 if __name__ == "__main__":

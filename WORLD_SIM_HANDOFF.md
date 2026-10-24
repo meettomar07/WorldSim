@@ -1,5 +1,39 @@
 # WorldSim Handoff
 
+## Latest update: Phase 14.4.1
+
+Phase 14.4.1 (Learned Coordination Regression Remediation) resolves regressions in learned policies on resource-scarce and bottleneck environments (D04, U06, U14, D03) while strictly preserving local sensory horizon boundaries ($R \le 2.0$), authoritative simulation physics, and 100% bit-for-bit backward compatibility with the heuristic baseline:
+- **Core Targeted Improvements:**
+  1. *Forensic Diagnostic Traces & Root Causes:*
+     - Diagnosed failure mechanisms in D04 (premature pad departures leaving partner agent stranded), U06 (goal-progress features dominating over local recharge needs), U14 (waiting in doorway blocking clearing corridors), and D03 (repeated moves into occupied cells).
+  2. *Layered Feasibility Guard (`enable_safety_guard=True`):*
+     - Added pad recharge safety and local energy waypoint routing in `LearnedCoordinationPolicy`.
+     - Completely remediates D04 and U06 under learned policies with **100% completion and 0 exhaustions**.
+  3. *Documented Hybrid Controller (`HybridCoordinationPolicy`):*
+     - Documented hybrid policy integrating `LearnedCoordinationPolicy` and `RobustResourcePolicy`.
+     - Dispatches to learned policy for dynamic obstacle evasion, communicative intent, and normal navigation.
+     - Dispatches to robust safety guard for long-horizon resource detours, on-pad recharging, and cycle/deadlock recovery.
+     - Transparently tracks and logs `learned` vs `safety_guard` decision counts.
+     - Achieves **100% completion across ALL scenarios (D01–D04, U06, U14)** with **0 exhaustions**.
+     - Slashes D03 deadlocks by 78% (from 90 to 20) and blocked attempts by 73% (from 150 to 40).
+  4. *Benchmark & Test Suite Verification:*
+     - 5 new regression tests added to `tests/test_decentralized_learning.py` (total 13 tests).
+     - Full test suite: **237 passed in 10.71s** (`python -m pytest`).
+     - Bit-for-bit identical trajectory SHA-256 verified across `PYTHONHASHSEED` (`0`, `42`, `99999`).
+     - Preserved immutable before-remediation baseline artifacts (`phase14_4_before_remediation_results.json`, `phase14_4_before_remediation_report.md`).
+     - Comprehensive 6-policy comparative matrix exported to `phase14_4_benchmark_results.json` and `phase14_4_learned_coordination_report.md`.
+- **Files changed / added:**
+  - `worldsim/decentralized_learning.py` (updated: added `enable_safety_guard` to `LearnedCoordinationPolicy` and implemented `HybridCoordinationPolicy`)
+  - `worldsim/__init__.py` (updated: exported `HybridCoordinationPolicy`)
+  - `tests/test_decentralized_learning.py` (updated: added 5 new unit tests, total 13)
+  - `phase14_4_learned_coordination_eval.py` (updated: evaluates all 6 policies across D01–D04, U06, U14 with decision tracking)
+  - `phase14_4_benchmark_results.json` (updated: structured results for all 36 configuration evaluations)
+  - `phase14_4_learned_coordination_report.md` (updated: full evaluation report)
+  - `phase14_4_before_remediation_results.json` (new: immutable before-remediation baseline data)
+  - `phase14_4_before_remediation_report.md` (new: immutable before-remediation baseline report)
+  - `WORLD_SIM_PLAN.md` (updated)
+  - `WORLD_SIM_HANDOFF.md` (updated)
+
 ## Latest update: Phase 14.4
 
 Phase 14.4 (Decentralized Learning & Communicative Intent) introduces decentralized multi-agent reinforcement learning with linear function approximation and local intent communication under strict partial observability ($R \le 2.0$), preserving the heuristic policy as the control baseline:

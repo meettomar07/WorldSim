@@ -32,7 +32,7 @@ from .multi_agent import (
     MultiAgentSimulation,
     MultiAgentWorldConfig,
 )
-from .robust_policy import AgentMemory
+from .robust_policy import AgentMemory, RobustResourcePolicy
 
 
 @dataclass(frozen=True, slots=True)
@@ -410,6 +410,7 @@ class LearnedCoordinationPolicy:
     Supports:
     - enable_communication=False (Non-communicative learned policy).
     - enable_communication=True (Communicative learned policy with R <= 2.0 intent sharing).
+    - enable_safety_guard=True (Remediated learned policy with local feasibility routing and pad safety).
     - Transparent feature evaluation and action selection.
     """
 
@@ -422,6 +423,7 @@ class LearnedCoordinationPolicy:
         learner: DecentralizedQLearner | None = None,
         enable_communication: bool = False,
         coordinator: MultiAgentCoordinator | None = None,
+        enable_safety_guard: bool = False,
     ) -> None:
         self.world_width = world_width
         self.world_height = world_height
@@ -429,6 +431,7 @@ class LearnedCoordinationPolicy:
         self.sensory_radius = sensory_radius
         self.enable_communication = enable_communication
         self.coordinator = coordinator
+        self.enable_safety_guard = enable_safety_guard
 
         self.feature_extractor = DecentralizedFeatureExtractor(
             world_width=world_width,
@@ -447,6 +450,13 @@ class LearnedCoordinationPolicy:
         self.last_q: float = 0.0
         self.step_count = 0
         self.consecutive_waits = 0
+
+        # Decision transparency tracking
+        self.decision_counts: dict[str, int] = {
+            "learned": 0,
+            "safety_guard": 0,
+        }
+        self.last_decision_mode: str = "learned"
 
     def get_legal_actions(self, observation: MultiAgentObservation) -> tuple[Action, ...]:
         """Compute legal action subset from geometry and energy."""
@@ -487,6 +497,51 @@ class LearnedCoordinationPolicy:
         if len(legal_actions) == 1:
             return legal_actions[0]
 
+        # Update local memory strictly from agent observation
+        self.memory.update(observation)
+
+        known_res = self.memory.available_resources()
+        on_pad = any(r.position == pos for r in observation.observed_resources) or any(r.position == pos for r in known_res)
+        cur_dist = abs(target.x - pos.x) + abs(target.y - pos.y) if target is not None else 0
+
+        # Feasibility safety guard layer
+        effective_obs = observation
+        if self.enable_safety_guard:
+            # 1. On-pad recharge safety: ensure agent charges sufficiently when needed
+            if on_pad and observation.energy < self.max_energy and (observation.energy < cur_dist + 2 or observation.energy < 8):
+                self.decision_counts["safety_guard"] += 1
+                self.last_decision_mode = "safety_guard"
+                self.step_count += 1
+                if self.coordinator is not None:
+                    self.coordinator.register_intent(aid, pos, target, current_position=pos)
+                return Action.RECHARGE
+
+            # 2. Long-horizon resource waypoint routing when energy is critically constrained
+            if not on_pad and known_res and observation.energy <= cur_dist + 1:
+                nearest_res = min(
+                    known_res,
+                    key=lambda r: abs(r.position.x - pos.x) + abs(r.position.y - pos.y),
+                )
+                self.decision_counts["safety_guard"] += 1
+                self.last_decision_mode = "safety_guard"
+                effective_obs = type(observation)(
+                    agent_id=observation.agent_id,
+                    entity_position=pos,
+                    cells=observation.cells,
+                    energy=observation.energy,
+                    observed_resources=observation.observed_resources,
+                    target=nearest_res.position,
+                    observed_agents=observation.observed_agents,
+                    shared_discoveries=observation.shared_discoveries,
+                    observed_dynamic_obstacles=getattr(observation, "observed_dynamic_obstacles", ()),
+                )
+            else:
+                self.decision_counts["learned"] += 1
+                self.last_decision_mode = "learned"
+        else:
+            self.decision_counts["learned"] += 1
+            self.last_decision_mode = "learned"
+
         # Gather local peer intentions if communication is enabled
         peer_intentions: dict[str, Position] = {}
         if self.enable_communication and self.coordinator is not None:
@@ -497,9 +552,6 @@ class LearnedCoordinationPolicy:
                 for oid, od in self.coordinator.agent_intentions.items()
                 if oid in visible_peers
             }
-
-        # Update local memory strictly from agent observation
-        self.memory.update(observation)
 
         # Inactive obstacles (exhausted peers) from observation and memory
         inactive_obs = set(self.memory.get_remembered_inactive_obstacles().keys())
@@ -513,11 +565,9 @@ class LearnedCoordinationPolicy:
             if 0 <= pred.x < self.world_width and 0 <= pred.y < self.world_height:
                 predicted_dyn.add(pred)
 
-        known_res = self.memory.available_resources()
-
         # Select action
         action, q_val, feats = self.learner.select_action(
-            observation=observation,
+            observation=effective_obs,
             feature_extractor=self.feature_extractor,
             legal_actions=legal_actions,
             peer_intentions=peer_intentions,
@@ -529,14 +579,13 @@ class LearnedCoordinationPolicy:
             greedy=greedy,
         )
 
-        on_res = any(r.position == pos for r in observation.observed_resources) or any(r.position == pos for r in known_res)
-        if action == Action.RECHARGE and not on_res:
+        if action == Action.RECHARGE and not on_pad:
             self.consecutive_waits += 1
         else:
             self.consecutive_waits = 0
 
         # Store for transition update
-        self.last_observation = observation
+        self.last_observation = effective_obs
         self.last_action = action
         self.last_features = feats
         self.last_q = q_val
@@ -567,6 +616,122 @@ class LearnedCoordinationPolicy:
     ) -> None:
         """Record action outcome into agent memory."""
         self.memory.record_action_result(pos, energy, action, success)
+
+
+class HybridCoordinationPolicy:
+    """Documented hybrid controller integrating LearnedCoordinationPolicy with RobustResourcePolicy.
+
+    Transparently routes decisions:
+    - Normal navigation, dynamic obstacle avoidance, and communicative intent:
+      delegates to LearnedCoordinationPolicy (logged under 'learned').
+    - Long-horizon resource feasibility detour, critical on-pad recharging, or
+      cycle/bottleneck deadlock recovery:
+      delegates to RobustResourcePolicy (logged under 'safety_guard').
+    """
+
+    def __init__(
+        self,
+        world_width: int,
+        world_height: int,
+        max_energy: int = 10,
+        sensory_radius: float = 2.0,
+        learner: DecentralizedQLearner | None = None,
+        base_learner: Any | None = None,
+        enable_communication: bool = True,
+        coordinator: MultiAgentCoordinator | None = None,
+    ) -> None:
+        self.world_width = world_width
+        self.world_height = world_height
+        self.max_energy = max_energy
+        self.sensory_radius = sensory_radius
+        self.enable_communication = enable_communication
+        self.coordinator = coordinator
+
+        self.robust = RobustResourcePolicy(
+            world_width=world_width,
+            world_height=world_height,
+            max_energy=max_energy,
+            sensory_radius=sensory_radius,
+            base_learner=base_learner,
+            coordinator=coordinator,
+        )
+        self.learned = LearnedCoordinationPolicy(
+            world_width=world_width,
+            world_height=world_height,
+            max_energy=max_energy,
+            sensory_radius=sensory_radius,
+            learner=learner,
+            enable_communication=enable_communication,
+            coordinator=coordinator,
+            enable_safety_guard=True,
+        )
+
+        self.decision_counts: dict[str, int] = {
+            "learned": 0,
+            "safety_guard": 0,
+        }
+        self.last_decision_mode: str = "learned"
+
+    def choose_action(self, observation: MultiAgentObservation, greedy: bool = True) -> Action:
+        """Select action with transparent hybrid arbitration between learned policy and safety guard."""
+        pos = observation.entity_position
+        target = observation.target
+        aid = getattr(observation, "agent_id", "agent")
+
+        # Terminal target check
+        if target is not None and pos == target:
+            return Action.UP
+
+        # Update local memory on both sub-policies
+        self.robust.memory.update(observation)
+        self.learned.memory.update(observation)
+
+        # Evaluate long-horizon resource needs and cycle deadlocks via robust policy analyzers
+        route_comp = self.robust.utility_evaluator.compare_routes(observation, self.robust.memory)
+        recharge_assessment = self.robust.recharge_evaluator.evaluate(
+            observation, self.robust.memory, recommended_target=route_comp.recommended_target
+        )
+        cycle_res = self.robust.cycle_detector.detect(self.robust.memory)
+
+        # Determine if safety guard is needed
+        on_pad = any(r.position == pos for r in self.robust.memory.available_resources())
+        need_recharge_guard = on_pad and recharge_assessment.is_beneficial
+        need_route_guard = route_comp.decision == "detour_to_resource"
+        need_deadlock_guard = cycle_res.detected or any(cnt >= 2 for cnt in self.robust.memory.blocked_destinations.values())
+
+        if need_recharge_guard or need_route_guard or need_deadlock_guard:
+            self.decision_counts["safety_guard"] += 1
+            self.last_decision_mode = "safety_guard"
+            chosen = self.robust.choose_action(observation)
+            # Sync intent with coordinator
+            if self.coordinator is not None:
+                nx, ny = pos.x, pos.y
+                if chosen == Action.UP:
+                    ny -= 1
+                elif chosen == Action.DOWN:
+                    ny += 1
+                elif chosen == Action.LEFT:
+                    nx -= 1
+                elif chosen == Action.RIGHT:
+                    nx += 1
+                dest = Position(nx, ny) if chosen != Action.RECHARGE else pos
+                self.coordinator.register_intent(aid, dest, target, current_position=pos)
+            return chosen
+        else:
+            self.decision_counts["learned"] += 1
+            self.last_decision_mode = "learned"
+            return self.learned.choose_action(observation, greedy=greedy)
+
+    def record_action_result(
+        self,
+        pos: Position,
+        energy: int,
+        action: Action,
+        success: bool,
+    ) -> None:
+        """Record action outcome into memories of both sub-policies."""
+        self.robust.record_action_result(pos, energy, action, success)
+        self.learned.record_action_result(pos, energy, action, success)
 
 
 class DecentralizedRewardEngine:

@@ -28,6 +28,7 @@ from .decentralized_learning import (
     DecentralizedLearningConfig,
     DecentralizedQLearner,
     DecentralizedRewardEngine,
+    HybridCoordinationPolicy,
     LearnedCoordinationPolicy,
     train_decentralized_coordination,
 )
@@ -103,6 +104,7 @@ __all__ = [
     "ExplorationController",
     "FairnessMonitor",
     "FeatureExtractor",
+    "HybridCoordinationPolicy",
     "LearningConfig",
     "LearningRunner",
     "LearnedCoordinationPolicy",

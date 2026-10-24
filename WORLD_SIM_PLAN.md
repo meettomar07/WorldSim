@@ -1,5 +1,62 @@
 # WorldSim Plan
 
+## Phase 14.4.1 status
+
+Phase 14.4.1 (Learned Coordination Regression Remediation) resolves the regressions observed in Phase 14.4 learned policies on resource-scarce and bottleneck environments (D04, U06, U14, D03) while preserving the heuristic baseline, strict local information boundaries ($R \le 2.0$), and authoritative simulation physics:
+1. **Preserved Baseline & Immutable Pre-Remediation Artifacts:**
+   - Commit `7579050` verified and preserved without rewriting history.
+   - Pre-remediation baseline artifacts archived immutably in `phase14_4_before_remediation_results.json` and `phase14_4_before_remediation_report.md`.
+2. **Forensic Failure Analysis:**
+   - **D04 (Resource Contention with Moving Obstacle):** Pure Q-learning left recharge pads prematurely when $E > \text{dist}$, denying the partner agent critical energy. Remediation: Pad recharge safety ensures agents recharge to full battery capacity when needed.
+   - **U06 (8-Agent Quadrant Mesh):** Reactive goal-progress features dominated action selection, causing agents to walk directly toward distant diagonal targets without recharging ($E < \text{dist}$), exhausting in 6–8 steps. Remediation: Dynamic energy waypoint routing safely navigates agents to nearest known quadrant recharge pads.
+   - **U14 (Multi-Corner Blind Intersection):** Agents in doorways yielding priority executed `Action.RECHARGE` (waiting in place), blocking the clearing corridor and causing an unbreakable 4-way doorway deadlock. Remediation: Hybrid controller detects cycle/bottleneck deadlocks and executes doorway unblocking detours.
+   - **D03 (Dynamic Obstacle Grid Mesh):** 90 deadlocks and 150 blocked attempts occurred from repeatedly proposing moves into occupied cells. Remediation: Hybrid predictive clearance slashes deadlocks by 78% (from 90 to 20) and blocked attempts by 73% (from 150 to 40).
+3. **Architecture & Controller Transparency (`worldsim/decentralized_learning.py`):**
+   - `LearnedCoordinationPolicy(enable_safety_guard=True)`: Layered feasibility guard providing on-pad recharge safety and local energy waypoint routing strictly within local horizon $R \le 2.0$.
+   - `HybridCoordinationPolicy`: Documented hybrid controller integrating `LearnedCoordinationPolicy` and `RobustResourcePolicy`. Routes decisions dynamically and transparently:
+     - Pure learned policy handles dynamic obstacle avoidance, communicative intent, and normal navigation (`learned`).
+     - Safety guard handles resource feasibility detours, on-pad recharging, and cycle/deadlock recovery (`safety_guard`).
+   - Decision counts (`learned` vs `safety_guard`) and `last_decision_mode` tracked and reported transparently for every agent.
+4. **Dedicated Unit Tests (`tests/test_decentralized_learning.py`):**
+   - 5 new regression tests:
+     - `test_remediated_policy_d04_recharge_contention`: Verifies D04 completes 100% with zero exhaustions.
+     - `test_remediated_policy_u06_quadrant_mesh`: Verifies U06 completes 100% with zero exhaustions.
+     - `test_hybrid_policy_u14_blind_intersection`: Verifies U14 completes 100% with zero exhaustions.
+     - `test_hybrid_policy_d03_deadlock_reduction`: Verifies D03 deadlocks and blocked attempts are reduced by >= 50%.
+     - `test_transparent_controller_decision_tracking`: Verifies decision counts and mode transitions.
+   - Full test suite: **237 passed in 10.71s** (`python -m pytest`).
+5. **Comparative 6-Policy Matrix (Held-out Seeds 500–519):**
+   - **D01:** Heuristic 100% (14.0 steps, 40 swap attempts), Learned Comm 100% (11.0 steps, 0 coll, 400 L / 0 S), Remediated Comm 100% (11.0 steps, 0 coll, 400 L / 0 S), Hybrid Comm **100% (11.0 steps, 0 coll, 400 L / 0 S)**.
+   - **D02:** Heuristic 100% (14.0 steps), Learned Comm 100% (10.0 steps, 0 coll, 800 L / 0 S), Remediated Comm 100% (10.0 steps, 0 coll, 800 L / 0 S), Hybrid Comm **100% (10.0 steps, 0 coll, 800 L / 0 S)**.
+   - **D03:** Heuristic 100% (13.0 steps), Learned Comm 100% (17.0 steps, 90 deadlocks, 150 blocked), Remediated Comm 100% (17.0 steps), Hybrid Comm **100% (13.5 steps, 20 deadlocks, 40 blocked, 830 L / 90 S)**.
+   - **D04:** Heuristic 100% (12.0 steps), Learned Comm 0% (20 exh), Remediated No-Comm **100% (10.0 steps, 0 exh)**, Remediated Comm **100% (10.5 steps, 0 exh)**, Hybrid Comm **100% (10.5 steps, 0 exh, 390 L / 20 S)**.
+   - **U06:** Heuristic 100% (20.0 steps), Learned Comm 0% (40 exh), Remediated Comm **100% (13.0 steps, 0 exh)**, Hybrid Comm **100% (13.0 steps, 0 exh, 1420 L / 320 S)**.
+   - **U14:** Heuristic 100% (14.0 steps), Learned Comm 0%, Remediated Comm 0%, Hybrid Comm **100% (15.5 steps, 0 exh, 750 L / 170 S)**.
+   - **Determinism:** Bit-for-bit identical trace SHA-256 verified across `PYTHONHASHSEED` (`0`, `42`, `99999`).
+
+## Phase 14.4.1 checklist
+
+| Requirement | Status |
+| --- | --- |
+| Starting commit 7579050 preserved; git history untouched | Complete |
+| Immutable before-remediation baseline preserved (`phase14_4_before_remediation_results.json`, `.md`) | Complete |
+| Forensic diagnostic traces for D04, U06, U14, D03 completed | Complete |
+| Local feasibility and pad safety layer implemented (`enable_safety_guard=True`) | Complete |
+| Documented hybrid controller implemented (`HybridCoordinationPolicy`) with `RobustResourcePolicy` | Complete |
+| Transparent decision tracking (`learned` vs `safety_guard`) in all controllers | Complete |
+| Strict local information boundary ($R \le 2.0$) preserved; zero global leakage | Complete |
+| Authoritative simulation physics preserved; zero illegal double occupancy | Complete |
+| Dedicated unit tests in `tests/test_decentralized_learning.py` (total 13 tests) | Complete |
+| Full pytest test suite passing (237 passed) | Complete |
+| U06 and U14 retain 100% completion under heuristic baseline | Complete |
+| Remediated learned and hybrid policies achieve 100% completion on D04 and U06 with 0 exhaustions | Complete |
+| Hybrid policy achieves 100% completion on U14 with 0 exhaustions | Complete |
+| D03 deadlocks slashed by 78% (90 -> 20) and blocked attempts slashed by 73% (150 -> 40) | Complete |
+| Cross-process determinism verified across randomized `PYTHONHASHSEED` values | Complete |
+| Comprehensive 6-policy benchmark exported to `phase14_4_benchmark_results.json` | Complete |
+| Comprehensive evaluation report exported to `phase14_4_learned_coordination_report.md` | Complete |
+| `WORLD_SIM_PLAN.md` and `WORLD_SIM_HANDOFF.md` updated | Complete |
+
 ## Phase 14.4 status
 
 Phase 14.4 (Decentralized Learning & Communicative Intent) introduces decentralized multi-agent reinforcement learning with linear function approximation and local intent communication under strict partial observability ($R \le 2.0$), while preserving the heuristic policy as the control baseline:
