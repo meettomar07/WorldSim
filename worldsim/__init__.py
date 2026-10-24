@@ -17,6 +17,12 @@ from .experiment import ExperimentResult, run_experiment, run_policy_experiment
 from .learning import EpisodeResult, EvaluationResult, LearningConfig, LearningRunner, QLearner
 from .linear_learning import FeatureExtractor, LinearLearningConfig, LinearLearningRunner, LinearQLearner
 from .memory import ExperienceMemory, MemoryEntry
+from .dynamic_obstacles import (
+    DynamicObstacleConfig,
+    DynamicObstacleState,
+    predict_next_obstacle_state,
+    predict_obstacle_trajectory,
+)
 from .models import Entity, Observation, Position, Resource, StepResult, WorldState
 from .multi_agent import (
     AgentConfig,
@@ -69,6 +75,8 @@ __all__ = [
     "CycleDetector",
     "DeadlockDetector",
     "DeadlockEvent",
+    "DynamicObstacleConfig",
+    "DynamicObstacleState",
     "EnergyAwarePolicy",
     "EnergyIgnorantPolicy",
     "EnergyPlanResult",

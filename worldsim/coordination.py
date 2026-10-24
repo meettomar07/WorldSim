@@ -581,6 +581,7 @@ class MultiAgentCoordinator:
         energy: int | None = None,
         completed_positions: Sequence[Position] | set[Position] | None = None,
         obstacle_positions: Sequence[Position] | set[Position] | None = None,
+        dynamic_obstacles: Sequence[Any] | None = None,
     ) -> Action | None:
         """Suggest an alternative action if the preferred action would cause a conflict."""
         if not self.enabled or not candidate_actions:
@@ -655,6 +656,24 @@ class MultiAgentCoordinator:
 
         # Check if the preferred action causes a conflict
         has_conflict = False
+
+        dyn_current_cells: set[Position] = set()
+        dyn_predicted_cells: set[Position] = set()
+        if dynamic_obstacles:
+            for obs in dynamic_obstacles:
+                obs_pos = getattr(obs, "position", None)
+                if obs_pos is None:
+                    continue
+                if self.coordination_mode == "centralized" or self.is_in_range(pos, obs_pos):
+                    dyn_current_cells.add(obs_pos)
+                    vel = getattr(obs, "velocity", (0, 0))
+                    nxt = Position(obs_pos.x + vel[0], obs_pos.y + vel[1])
+                    dyn_predicted_cells.add(nxt)
+                    all_obs.add(obs_pos)
+                    all_obs.add(nxt)
+
+        if pref_dest in dyn_current_cells or pref_dest in dyn_predicted_cells:
+            has_conflict = True
 
         def is_crossroad(p: Position) -> bool:
             diags = (
@@ -762,6 +781,8 @@ class MultiAgentCoordinator:
             if a == pref:
                 continue
             if a == Action.RECHARGE:
+                if pos in dyn_predicted_cells:
+                    continue  # Unsafe to wait if dynamic obstacle is moving directly into pos!
                 safe_actions.append(a)
                 continue
 
@@ -850,6 +871,7 @@ class MultiAgentCoordinator:
         current_positions: dict[str, Position] | None = None,
         completed_positions: Sequence[Position] | set[Position] | None = None,
         obstacle_positions: Sequence[Position] | set[Position] | None = None,
+        dynamic_obstacles: Sequence[Any] | None = None,
     ) -> Action | None:
         """Provide an actionable sidestep or yield behavior to resolve detected deadlocks."""
         if not self.enabled or not legal_actions:

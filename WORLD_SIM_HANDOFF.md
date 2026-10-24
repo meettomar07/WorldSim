@@ -1,5 +1,48 @@
 # WorldSim Handoff
 
+## Latest update: Phase 14.3
+
+Phase 14.3 (Dynamic Obstacle Avoidance) introduces moving obstacles and local velocity-aware prediction and avoidance while preserving the working centralized baseline and decentralized local-horizon coordination modes:
+- **Core Targeted Improvements:**
+  1. *Dynamic Obstacles Architecture (`worldsim/dynamic_obstacles.py`):*
+     - Deterministic patterns: `"linear_bounce"` (moves along velocity vector `(dx, dy)`, bouncing on boundaries, walls, resources, agents, and other obstacles), `"patrol"` (cycles or ping-pongs deterministically through waypoints), and `"fixed"`.
+     - Runtime state tracking: `DynamicObstacleConfig` and `DynamicObstacleState` recording runtime position, velocity, waypoint index, and reversal state.
+     - Authoritative physical simulation: `MultiAgentSimulation._resolve_conflicts` enforces strict non-overlapping physics across agents, dynamic obstacles, and resources, guaranteeing zero illegal double-occupancy under all conditions.
+     - Dynamic obstacle trajectory history and collision metrics recorded per step.
+  2. *Local Prediction & Velocity-Aware Avoidance (`worldsim/robust_policy.py`, `worldsim/coordination.py`):*
+     - Local sensory horizon restriction: In decentralized mode, dynamic obstacles are observable strictly within Euclidean distance $\le 2.0$.
+     - In `AgentMemory`: Ingests moving obstacle positions and velocities, revalidates observed cells against field of view, tracks TTL expiration (`dynamic_obstacle_ttl = 6`), and computes predicted obstacle cells over a configurable horizon (`get_predicted_dynamic_obstacle_cells(horizon=2)`).
+     - In `RobustResourcePolicy`: In the presence of dynamic obstacles, permits `Action.RECHARGE` as an intentional wait in place; applies heavy penalty (`-200.0`) if an obstacle is moving into the agent's current position, and rewards safe waiting (`+15.0`) when crossing corridors or pad doorsteps while an obstacle traverses nearby.
+     - Goal-aligned topological path planning: Refined BFS direction exploration to align with target displacement, preventing oscillatory backtracking onto recently vacated recharge pads while smoothly detouring laterally around moving obstacles.
+     - Coordinator integration: `suggest_alternative_move` evaluates obstacle positions and predicted paths within local range, pruning collision-prone alternatives and allowing safe waiting unless an obstacle is advancing into the agent's cell.
+  3. *Comprehensive Benchmark Suite (D01–D04 across seeds 500–519):*
+     - **D01 (Dual Patrol Chokepoint Crossing):** Static 100.0% (9.0 steps), Centralized 100.0% (14.0 steps, 0 dyn collisions), Decentralized 100.0% (14.0 steps, 0 dyn collisions).
+     - **D02 (Dynamic Bottleneck Mesh):** Static 100.0% (13.0 steps), Centralized 100.0% (14.0 steps, 0 dyn collisions), Decentralized 100.0% (14.0 steps, 0 dyn collisions).
+     - **D03 (Dynamic Obstacle Grid Mesh):** Static 100.0% (13.0 steps), Centralized 100.0% (13.0 steps, 0 dyn collisions), Decentralized 100.0% (13.0 steps, 0 dyn collisions).
+     - **D04 (Resource Approach with Moving Obstacle):** Static 100.0% (13.5 steps), Centralized 100.0% (12.0 steps, 0 dyn collisions), Decentralized 100.0% (12.0 steps, 0 dyn collisions).
+     - **U06 Regression:** 100.0% completion across seeds 500–519 (0 exhaustions).
+     - **U14 Regression:** 100.0% completion across seeds 500–519 (0 exhaustions).
+     - **Total Dynamic Collisions:** 0 across all evaluated dynamic modes and seeds.
+- **Benchmark & Test Suite Verification:**
+  - Dedicated unit test suite `tests/test_dynamic_obstacle_avoidance.py` (8 tests covering deterministic trajectories, approaching obstacles, crossing obstacles, stale observations outside range, obstacle blocking, safe waiting, U06 regression, U14 regression).
+  - Full test suite: **224 passed in 8.29s** (`python -m pytest`).
+  - Cross-process determinism verified across randomized `PYTHONHASHSEED` (`0`, `999`, `12345`).
+  - Benchmarks and reports: `phase14_3_benchmark_results.json` and `phase14_3_dynamic_obstacle_report.md`.
+
+Files changed / added:
+- `worldsim/dynamic_obstacles.py` (new: deterministic dynamic obstacle configurations, state, physics, and trajectory prediction)
+- `worldsim/multi_agent.py` (updated: dynamic obstacle configuration validation, runtime state, authoritative conflict resolution, and telemetry)
+- `worldsim/coordination.py` (updated: dynamic obstacle awareness in `suggest_alternative_move` and safe wait pruning)
+- `worldsim/robust_policy.py` (updated: memory ingestion, TTL expiration, visual revalidation, dynamic obstacle prediction, safe waiting scoring, and goal-aligned path planning)
+- `worldsim/models.py` (updated: duck-type `observed_dynamic_obstacles` in `Observation`)
+- `worldsim/__init__.py` (updated: exported dynamic obstacle classes and helpers)
+- `tests/test_dynamic_obstacle_avoidance.py` (new test suite: 8 tests for dynamic obstacle avoidance)
+- `phase14_3_dynamic_obstacle_eval.py` (new evaluation harness for D01–D04, U06, and U14)
+- `phase14_3_benchmark_results.json` (new artifact: benchmark results)
+- `phase14_3_dynamic_obstacle_report.md` (new artifact: evaluation report)
+- `WORLD_SIM_PLAN.md` (updated)
+- `WORLD_SIM_HANDOFF.md` (updated)
+
 ## Latest update: Phase 14.2 Remediation
 
 Phase 14.2 Remediation resolves the two known decentralized-mode regressions (U06 and U14) while strictly preserving local sensory horizon boundaries ($R = 2.0$), authoritative simulation physics, and 100% bit-for-bit backward compatibility with the centralized baseline:

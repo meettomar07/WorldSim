@@ -48,7 +48,9 @@ class AgentMemory:
     action_history: deque[tuple[Position, int, Action, bool]] = field(default_factory=lambda: deque(maxlen=30))
     blocked_destinations: dict[Position, int] = field(default_factory=dict)
     remembered_obstacles: dict[Position, tuple[str, int]] = field(default_factory=dict)
+    remembered_dynamic_obstacles: dict[str, tuple[Position, tuple[int, int], int]] = field(default_factory=dict)
     obstacle_memory_ttl: int = 15
+    dynamic_obstacle_ttl: int = 6
     consecutive_recharges_at_pos: int = 0
     recovery_attempts: int = 0
     exploration_discoveries: int = 0
@@ -87,6 +89,32 @@ class AgentMemory:
         ]
         for p in expired:
             del self.remembered_obstacles[p]
+
+        # Ingest observed dynamic obstacles within local sensory horizon
+        observed_dyn_obs = getattr(observation, "observed_dynamic_obstacles", ())
+        for obs in observed_dyn_obs:
+            vel = obs.velocity
+            if vel == (0, 0) and obs.id in self.remembered_dynamic_obstacles:
+                prev_pos, prev_vel, prev_step = self.remembered_dynamic_obstacles[obs.id]
+                dt = self.step_count - prev_step
+                if dt > 0:
+                    vel = ((obs.position.x - prev_pos.x) // dt, (obs.position.y - prev_pos.y) // dt)
+            self.remembered_dynamic_obstacles[obs.id] = (obs.position, vel, self.step_count)
+
+        # Visual revalidation: if a cell is in current observation field, clear moved dynamic obstacles
+        for d_id, (d_pos, d_vel, d_step) in list(self.remembered_dynamic_obstacles.items()):
+            if d_pos in observation.cells:
+                if not any(o.position == d_pos for o in observed_dyn_obs):
+                    if not any(o.id == d_id for o in observed_dyn_obs):
+                        del self.remembered_dynamic_obstacles[d_id]
+
+        # Expire stale dynamic obstacle memory based on TTL
+        expired_dyn = [
+            d_id for d_id, (_, _, d_step) in self.remembered_dynamic_obstacles.items()
+            if self.step_count - d_step > self.dynamic_obstacle_ttl
+        ]
+        for d_id in expired_dyn:
+            del self.remembered_dynamic_obstacles[d_id]
 
         # Check for newly discovered resources
         for res in observation.observed_resources:
@@ -142,6 +170,21 @@ class AgentMemory:
     def get_remembered_inactive_obstacles(self) -> dict[Position, str]:
         """Return currently remembered inactive obstacles and their status."""
         return {pos: status for pos, (status, _) in self.remembered_obstacles.items()}
+
+    def get_remembered_dynamic_obstacles(self) -> dict[str, tuple[Position, tuple[int, int], int]]:
+        """Return currently remembered dynamic obstacles (id -> (pos, velocity, step))."""
+        return dict(self.remembered_dynamic_obstacles)
+
+    def get_predicted_dynamic_obstacle_cells(self, horizon: int = 2) -> set[Position]:
+        """Return set of cells predicted to be occupied by dynamic obstacles over the horizon."""
+        occupied: set[Position] = set()
+        for d_id, (pos, vel, step) in self.remembered_dynamic_obstacles.items():
+            occupied.add(pos)
+            for t in range(1, horizon + 1):
+                pred = Position(pos.x + vel[0] * t, pos.y + vel[1] * t)
+                if 0 <= pred.x < self.world_width and 0 <= pred.y < self.world_height:
+                    occupied.add(pred)
+        return occupied
 
     def is_depleted(self, pos: Position) -> bool:
         """Return whether a resource at pos is known to be depleted."""
@@ -700,6 +743,9 @@ class RobustResourcePolicy:
 
         if any(r.position == pos and not self.memory.is_depleted(pos) for r in observation.observed_resources):
             legal.append(Action.RECHARGE)
+        elif getattr(observation, "observed_dynamic_obstacles", ()) or getattr(self.memory, "remembered_dynamic_obstacles", None):
+            # Dynamic obstacles present: allow Action.RECHARGE as an intentional wait in place
+            legal.append(Action.RECHARGE)
 
         return tuple(legal) if legal else tuple(Action)
 
@@ -717,7 +763,10 @@ class RobustResourcePolicy:
         while queue:
             path = queue.popleft()
             curr = path[-1]
-            for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+            gx, gy = goal.x - curr.x, goal.y - curr.y
+            dirs = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+            dirs.sort(key=lambda d: (abs(goal.x - (curr.x + d[0])) + abs(goal.y - (curr.y + d[1])), -(d[0] * gx + d[1] * gy)))
+            for dx, dy in dirs:
                 nx, ny = curr.x + dx, curr.y + dy
                 if 0 <= nx < self.world_width and 0 <= ny < self.world_height:
                     nxt = Position(nx, ny)
@@ -783,6 +832,14 @@ class RobustResourcePolicy:
             elif rem_status == "reached_target":
                 completed_positions.add(rem_pos)
 
+        # Phase 14.3: Local prediction for dynamic obstacles
+        dyn_cells_now = {pos for pos, vel, step in self.memory.remembered_dynamic_obstacles.values()}
+        dyn_cells_pred_next = {
+            Position(pos.x + vel[0], pos.y + vel[1])
+            for pos, vel, step in self.memory.remembered_dynamic_obstacles.values()
+        }
+        dyn_cells_horizon = self.memory.get_predicted_dynamic_obstacle_cells(horizon=2)
+
         rec_target = route_comp.recommended_target
         bfs_next_cell = None
         if route_comp.decision == "direct_to_target" and rec_target is not None:
@@ -800,8 +857,18 @@ class RobustResourcePolicy:
 
             # Apply Recharge Control
             if action == Action.RECHARGE:
-                if not recharge_assessment.is_beneficial:
-                    score -= 50.0  # Heavily penalize wasteful recharge
+                if pos in dyn_cells_pred_next:
+                    # Imminent collision: dynamic obstacle is moving directly into pos!
+                    score -= 200.0
+                elif not recharge_assessment.is_beneficial:
+                    if self.memory.remembered_dynamic_obstacles and any(
+                        Position(pos.x + dx, pos.y + dy) in (dyn_cells_now | dyn_cells_pred_next)
+                        for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0))
+                    ):
+                        # Safe wait: an obstacle is crossing or blocking nearby cells, waiting is beneficial
+                        score += 15.0
+                    else:
+                        score -= 50.0  # Heavily penalize wasteful recharge
                 else:
                     score += 35.0  # Strongly favor beneficial recharge
             else:
@@ -819,6 +886,14 @@ class RobustResourcePolicy:
                 is_goal_or_res = (target is not None and dest_pos == target) or any(
                     r.position == dest_pos for r in self.memory.available_resources()
                 )
+
+                # Dynamic obstacle avoidance: avoid current and predicted dynamic obstacle cells
+                if dest_pos in dyn_cells_now:
+                    score -= 150.0
+                elif dest_pos in dyn_cells_pred_next:
+                    score -= 120.0
+                elif dest_pos in dyn_cells_horizon:
+                    score -= 40.0
 
                 # Waypoint & BFS guidance toward recommended target (target or resource)
                 if bfs_next_cell is not None:
@@ -910,6 +985,7 @@ class RobustResourcePolicy:
                 energy=energy,
                 completed_positions=completed_positions,
                 obstacle_positions=exhausted_positions,
+                dynamic_obstacles=getattr(observation, "observed_dynamic_obstacles", ()),
             )
             if alt is not None:
                 best_action = alt
@@ -918,3 +994,10 @@ class RobustResourcePolicy:
             self.coordinator.register_intent(aid, dest, rec_target, current_position=pos)
 
         return best_action
+
+    select_action = choose_action
+
+    def record_action_result(self, pos: Position, energy: int, action: Action, success: bool) -> None:
+        self.memory.record_action_result(pos, energy, action, success)
+
+    record_step_result = record_action_result
