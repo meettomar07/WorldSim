@@ -30,8 +30,8 @@ Phase 15.0 (Live 2D World Viewer & Simulation Interface) implements a working, r
   4. *CLI Launcher (`run_viewer.py`):*
      - Standard CLI launcher supporting `--host`, `--port`, `--scenario`, `--policy`, `--seed`, and `--no-browser`.
   5. *Test Suite & Determinism Verification (`tests/test_web_viewer.py`):*
-     - 10 new unit and integration tests verifying session initialization, snapshot schema, step advancement, reset behavior, scenario selection (D04, U06, U14), policy modes, REST API endpoints over HTTP, authoritative determinism parity, and U14 full episode completion.
-     - Full test suite: **249 passed in 9.53s** (`python -m pytest`).
+     - 13 comprehensive unit and integration tests verifying session initialization, snapshot schema, step advancement, reset behavior, scenario selection (D04, U06, U14), energy cap fidelity (U09, U10), policy modes, REST API endpoints over HTTP, adversarial safety, authoritative determinism parity, and U14 full episode completion.
+     - Full test suite: **252 passed in 12.02s** (`python -m pytest`).
      - Bit-for-bit identical trajectory parity confirmed between session interface and direct headless simulation.
 - **Launch Instructions:**
   ```bash

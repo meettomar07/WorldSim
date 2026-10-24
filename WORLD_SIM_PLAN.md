@@ -38,8 +38,8 @@ Phase 15.0 (Live 2D World Viewer & Simulation Interface) builds a real-time, hig
    - Simple entry point: `python run_viewer.py [--port 8000] [--scenario D01] [--policy hybrid_comm] [--seed 42] [--no-browser]`.
    - Clean keyboard interrupt handling (`Ctrl+C`).
 5. **Comprehensive Automated Test Suite (`tests/test_web_viewer.py`):**
-   - 10 new unit and integration tests verifying session initialization, snapshot schema, step advancement, reset behavior, scenario selection (D04, U06, U14), policy modes, REST API endpoints over HTTP, authoritative determinism parity, and U14 full episode completion.
-   - Full test suite passes: **249 passed in 9.53s**.
+   - 13 comprehensive unit and integration tests verifying session initialization, snapshot schema, step advancement, reset behavior, scenario selection (D04, U06, U14), max energy fidelity (U09, U10), policy modes, REST API endpoints over HTTP, adversarial payload safety, authoritative determinism parity, and U14 full episode completion.
+   - Full test suite passes: **252 passed in 12.02s**.
 
 ## Phase 15.0 checklist
 

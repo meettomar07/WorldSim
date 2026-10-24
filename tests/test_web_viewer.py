@@ -128,7 +128,7 @@ def test_session_reset():
     assert snap_reset["tick"] == 0
     assert snap_reset["agents"]["agent_w"]["x"] == 0
     assert snap_reset["agents"]["agent_w"]["y"] == 2
-    assert snap_reset["agents"]["agent_w"]["energy"] == 10
+    assert snap_reset["agents"]["agent_w"]["energy"] == 12
     assert len(snap_reset["agents"]["agent_w"]["trail"]) == 1
 
 
@@ -293,4 +293,63 @@ def test_u14_full_episode_completion():
     assert session.overall_completed
     assert snap["metrics"]["reached_agents"] == 4
     assert snap["metrics"]["physical_collisions"] == 0
+
+
+def test_scenario_max_energy_fidelity():
+    """Verify scenarios with custom max_energy (U09, U10, D04) configure the simulation engine correctly."""
+    session = SimulationSession(default_scenario="U09", default_policy="hybrid_comm", default_seed=42)
+    assert session.sim.config.max_energy == 8
+    assert session.max_energy == 8
+
+    session.load_scenario("D04", seed=42)
+    assert session.sim.config.max_energy == 10
+    assert session.max_energy == 10
+
+    session.load_scenario("U10", seed=42)
+    assert session.sim.config.max_energy == 8
+    assert session.max_energy == 8
+
+
+def test_adversarial_payloads_and_safety():
+    """Verify robust handling of empty, invalid, or malformed API payloads."""
+    session = SimulationSession(default_scenario="D01", default_policy="hybrid_comm", default_seed=42)
+    server = LiveViewerServer(host="127.0.0.1", port=0, session=session)
+    server.start()
+    base_url = f"http://127.0.0.1:{server.port}"
+
+    try:
+        # Invalid scenario ID -> safe fallback to D01 without crashing
+        payload = json.dumps({"scenario_id": "UNKNOWN_XYZ_999", "seed": 42}).encode()
+        req = urllib.request.Request(f"{base_url}/api/select", data=payload, headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode())
+            assert data["scenario"]["id"] == "D01"
+
+        # Empty body -> safe handling
+        req_empty = urllib.request.Request(f"{base_url}/api/select", data=b"", headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req_empty) as resp:
+            assert resp.status == 200
+
+        # OPTIONS preflight
+        req_opts = urllib.request.Request(f"{base_url}/api/state", method="OPTIONS")
+        with urllib.request.urlopen(req_opts) as resp:
+            assert resp.status == 200
+            assert resp.headers.get("Access-Control-Allow-Origin") == "*"
+
+        # GET favicon
+        with urllib.request.urlopen(f"{base_url}/favicon.ico") as resp:
+            assert resp.status == 204
+
+    finally:
+        server.stop()
+
+
+def test_event_log_bounds_and_rapid_stepping():
+    """Verify rapid repeated stepping caps event log growth at 60 items."""
+    session = SimulationSession(default_scenario="D03", default_policy="hybrid_comm", default_seed=42)
+    for _ in range(70):
+        snap = session.step()
+    assert len(snap["recent_events"]) <= 60
+
 

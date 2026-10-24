@@ -190,14 +190,14 @@ class SimulationSession:
             "family": "Dynamic",
             "width": 8,
             "height": 5,
-            "max_energy": 10,
+            "max_energy": 12,
             "agents": [
-                AgentConfig(id="agent_w", initial_x=0, initial_y=2, initial_energy=10, target=Position(7, 2)),
-                AgentConfig(id="agent_e", initial_x=7, initial_y=2, initial_energy=10, target=Position(0, 2)),
+                AgentConfig(id="agent_w", initial_x=0, initial_y=2, initial_energy=12, target=Position(7, 2)),
+                AgentConfig(id="agent_e", initial_x=7, initial_y=2, initial_energy=12, target=Position(0, 2)),
             ],
             "resources": [],
             "dynamic_obstacles": [
-                DynamicObstacleConfig(id="obs_patrol_1", initial_x=3, initial_y=0, pattern="patrol", waypoints=(Position(3, 0), Position(3, 4))),
+                DynamicObstacleConfig(id="obs_patrol_1", initial_x=2, initial_y=0, pattern="patrol", waypoints=(Position(2, 0), Position(2, 4))),
                 DynamicObstacleConfig(id="obs_patrol_2", initial_x=5, initial_y=4, pattern="patrol", waypoints=(Position(5, 4), Position(5, 0))),
             ],
             "walls": [],
@@ -253,7 +253,7 @@ class SimulationSession:
             "family": "Dynamic",
             "width": 7,
             "height": 7,
-            "max_energy": 7,
+            "max_energy": 10,
             "agents": [
                 AgentConfig(id="agent_left", initial_x=0, initial_y=3, initial_energy=7, target=Position(6, 3)),
                 AgentConfig(id="agent_right", initial_x=6, initial_y=3, initial_energy=7, target=Position(0, 3)),
@@ -265,6 +265,28 @@ class SimulationSession:
             ],
             "walls": [],
         }
+
+        # Dynamic Scenarios from Phase 14.3 builder
+        try:
+            repo_dir = Path(__file__).resolve().parent.parent
+            if str(repo_dir) not in sys.path:
+                sys.path.insert(0, str(repo_dir))
+            from phase14_3_dynamic_obstacle_eval import build_controlled_dynamic_scenarios
+            for scen in build_controlled_dynamic_scenarios():
+                registry[scen["id"]] = {
+                    "id": scen["id"],
+                    "name": scen["name"],
+                    "family": "Dynamic",
+                    "width": scen["width"],
+                    "height": scen["height"],
+                    "max_energy": scen.get("max_energy", max(10, max(a.initial_energy for a in scen["agents"]))),
+                    "agents": list(scen["agents"]),
+                    "resources": list(scen.get("resources", ())),
+                    "dynamic_obstacles": list(scen.get("dynamic_obstacles", ())),
+                    "walls": [],
+                }
+        except Exception:
+            pass
 
         # 2. Benchmark Scenarios from Phase 13.5 Unseen Audit
         try:
@@ -486,6 +508,7 @@ class SimulationSession:
             agents=tuple(scen["agents"]),
             resources=tuple(scen.get("resources", ())),
             dynamic_obstacles=tuple(scen.get("dynamic_obstacles", ())),
+            max_energy=self.max_energy,
             sensory_radius=2.0,
             communication_radius=2.0,
             enable_coordination=True,
@@ -653,6 +676,7 @@ class SimulationSession:
         for aid, agent in self.sim.state.agents.items():
             if not agent.active or aid not in self.policies:
                 actions[aid] = Action.UP
+                self.last_actions[aid] = Action.UP.value
                 continue
 
             obs = self.sim.observe_agent(aid)
@@ -978,6 +1002,11 @@ class SimulationHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
             self._send_cors_headers()
             self.end_headers()
             self.wfile.write(data)
+
+        elif path == "/favicon.ico":
+            self.send_response(204)
+            self._send_cors_headers()
+            self.end_headers()
 
         else:
             self.send_response(404)
