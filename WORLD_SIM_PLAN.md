@@ -1,5 +1,69 @@
 # WorldSim Plan
 
+## Phase 15.0 status
+
+Phase 15.0 (Live 2D World Viewer & Simulation Interface) builds a real-time, high-performance 2D web-based visualization and control interface for WorldSim. The world itself is the primary focus: terrain grid, static walls/pillars, glowing recharge pads, moving dynamic obstacles with velocity arrows, and autonomous agents navigating the authoritative Python simulation:
+1. **Preserved Baseline & Commit Integrity:**
+   - Starting commit `d27c18e` verified and preserved without rewriting history.
+   - Authoritative simulation physics strictly maintained: `physical_collisions == 0` (zero illegal cell overlap).
+   - Zero external third-party dependencies required (uses standard library `http.server.ThreadingHTTPServer`).
+2. **Authoritative Simulation Session (`worldsim/web_viewer.py`):**
+   - `SimulationSession`: Encapsulates authoritative simulation state, step advancement, scenario loading, and snapshot serialization.
+   - Comprehensive scenario coverage:
+     * Dynamic obstacle scenarios: D01 (Chokepoint), D02 (Bottleneck), D03 (Grid Mesh), D04 (Resource Approach).
+     * Generalization benchmark scenarios: U01–U16 (including U06 8-agent quadrant mesh and U14 4-pillar blind intersection).
+     * Baseline scenarios: B01 (Corridor Head-on), B02 (Cross Intersection).
+   - Full policy integration:
+     * `hybrid_comm`: Learned linear Q-policy with safe recharge/detour arbitration and local intent communication ($R \le 2.0$).
+     * `remediated_comm`: Pure learned Q-policy with pad safety and local intent communication.
+     * `learned_comm`: Learned Q-policy with local intent communication.
+     * `learned_no_comm`: Non-communicative learned Q-policy.
+     * `heuristic`: Decentralized `RobustResourcePolicy` baseline.
+     * `centralized`: Centralized coordinator baseline.
+3. **High-Performance 2D Web Visualization Frontend (`worldsim/static/index.html`):**
+   - High-DPI HTML5/Canvas rendering with crisp coordinate scale ($0..W-1, 0..H-1$).
+   - Real-time sub-second position interpolation (`requestAnimationFrame`) for smooth agent gliding.
+   - Interactive Agent Inspector: Clicking any agent inspects true engine state: ID, position, target, battery gauge, action, action result, decision attribution badge (`[LEARNED]`, `[SAFETY GUARD]`, `[HEURISTIC]`), visible peers within $R \le 2.0$, and communicated intent vector.
+   - Toggleable Debug Overlays:
+     * Breadcrumb path trails with fading alpha.
+     * Local sensory horizon ($R \le 2.0$) translucent fields.
+     * Communicated intent vectors (cyan dashed rays) and peer-to-peer communication links.
+     * Moving obstacle predicted trajectories and velocity chevrons.
+     * Conflict attempt and deadlock markers.
+     * Target displacement lines.
+   - Full simulation controls: Play/pause (Spacebar), step 1 tick (N / ArrowRight), reset (R), speed slider (50ms–1000ms), scenario selector, policy selector, seed selector.
+   - Live Telemetry Panel: Tick counter, goal completion %, authoritative physical collision invariant (0), conflict attempts breakdown (vertex, swap, occupied, dynamic), deadlock events, and cumulative decision attribution.
+   - Scrolling live event stream logging step outcomes, recharges, conflicts, and deadlock resolutions.
+4. **CLI Launcher (`run_viewer.py`):**
+   - Simple entry point: `python run_viewer.py [--port 8000] [--scenario D01] [--policy hybrid_comm] [--seed 42] [--no-browser]`.
+   - Clean keyboard interrupt handling (`Ctrl+C`).
+5. **Comprehensive Automated Test Suite (`tests/test_web_viewer.py`):**
+   - 10 new unit and integration tests verifying session initialization, snapshot schema, step advancement, reset behavior, scenario selection (D04, U06, U14), policy modes, REST API endpoints over HTTP, authoritative determinism parity, and U14 full episode completion.
+   - Full test suite passes: **249 passed in 9.53s**.
+
+## Phase 15.0 checklist
+
+| Requirement | Status |
+| --- | --- |
+| Starting commit d27c18e preserved; git history untouched | Complete |
+| Clean separation between authoritative simulation engine and visualization | Complete |
+| Simulation state remains authoritative; rendering never determines decisions | Complete |
+| Zero external web framework dependencies (standard library `http.server.ThreadingHTTPServer`) | Complete |
+| Real-time 2D canvas visualization with terrain, walls, recharge pads, moving obstacles, agents | Complete |
+| Visual distinction between agents, static obstacles, moving obstacles, and resources | Complete |
+| Distinct conflict attempt accounting vs authoritative 0 physical overlap invariant | Complete |
+| Full scenario support: Dynamic (D01–D04), Generalization (U01–U16), Baseline (B01, B02) | Complete |
+| Full policy support: hybrid_comm, remediated_comm, learned_comm, learned_no_comm, heuristic, centralized | Complete |
+| Interactive controls: Play/pause, step 1 tick, reset, speed slider (50ms–1000ms), scenario, policy, seed | Complete |
+| Interactive Agent Inspector: ID, coordinates, battery gauge, action result, decision attribution badge | Complete |
+| Toggleable debug overlays: Trails, sensory horizon (R<=2), intent vectors, obstacle paths, conflicts | Complete |
+| CLI launcher script `run_viewer.py` with configurable host, port, scenario, policy, seed | Complete |
+| REST API endpoints: `/api/state`, `/api/scenarios`, `/api/policies`, `/api/step`, `/api/reset`, `/api/select` | Complete |
+| Dedicated test suite `tests/test_web_viewer.py` (10 passed in 0.84s) | Complete |
+| Full pytest test suite passing (249 passed in 9.53s) | Complete |
+| Bit-for-bit determinism parity verified between session interface and headless simulation | Complete |
+| `WORLD_SIM_PLAN.md` and `WORLD_SIM_HANDOFF.md` updated with verified outcomes | Complete |
+
 ## Phase 14.4.2 status
 
 Phase 14.4.2 (U14 Final Audit and Baseline Freeze) completes a forensic divergence audit of Scenario U14 (Multi-Corner Blind Intersection), establishes why the hybrid controller succeeds where the remediated learned policy fails, verifies transparent metric computation, freezes the baseline, and adds dedicated regression tests:

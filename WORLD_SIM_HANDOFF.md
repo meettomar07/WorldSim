@@ -1,5 +1,67 @@
 # WorldSim Handoff
 
+## Latest update: Phase 15.0
+
+Phase 15.0 (Live 2D World Viewer & Simulation Interface) implements a working, real-time 2D visualization of WorldSim. The world itself is the primary focus: terrain grid, coordinate markers, static walls/pillars, glowing recharge pads with capacity indicators, moving dynamic obstacles with velocity arrows, and autonomous agents navigating the authoritative Python simulation:
+- **Core Targeted Improvements:**
+  1. *Authoritative Separation & Architecture (`worldsim/web_viewer.py`):*
+     - Clear architectural separation: The simulation engine in Python remains strictly authoritative for state updates, movement legality, and conflict resolution; the web frontend is purely a rendering and control interface.
+     - `SimulationSession`: Encapsulates multi-agent simulation instances, policy execution, dynamic obstacle tracking, pre-positioned walls (exhausted entities), and JSON snapshot serialization.
+     - Zero external dependencies: Uses standard library `http.server.ThreadingHTTPServer` to provide REST API endpoints and serve the web application without requiring third-party web frameworks.
+  2. *Scenario & Policy Coverage:*
+     - Full support for all dynamic scenarios: D01 (Chokepoint Crossing), D02 (Bottleneck Mesh), D03 (Obstacle Grid Mesh), D04 (Resource Approach with Moving Obstacle).
+     - Full support for all 16 generalization audit scenarios: U01–U16 (including U06 8-agent quadrant mesh and U14 4-corner pillar blind intersection).
+     - Baseline multi-agent scenarios: B01 (2-Agent Head-on Crossing), B02 (4-Agent Crossroad Intersection).
+     - Full policy selection: `hybrid_comm` (default), `remediated_comm`, `learned_comm`, `learned_no_comm`, `heuristic`, and `centralized`.
+  3. *High-Performance 2D Web Frontend (`worldsim/static/index.html`):*
+     - High-DPI HTML5/Canvas rendering with crisp coordinate indices ($0..W-1, 0..H-1$).
+     - Real-time sub-second position interpolation (`requestAnimationFrame`) for smooth agent gliding.
+     - Interactive Agent Inspector: Clicking any agent inspects true engine state: ID, position, target, battery gauge, action, action result, decision attribution badge (`[LEARNED]`, `[SAFETY GUARD]`, `[HEURISTIC]`), visible peers within $R \le 2.0$, and communicated intent vector.
+     - Toggleable Debug Overlays:
+       * Breadcrumb path trails with fading alpha.
+       * Local sensory horizon ($R \le 2.0$) translucent fields.
+       * Communicated intent vectors (cyan dashed rays) and peer-to-peer communication links.
+       * Moving obstacle predicted trajectories and velocity chevrons.
+       * Conflict attempt and deadlock markers.
+       * Target displacement lines.
+     - Full simulation controls: Play/pause (Spacebar), step 1 tick (N / ArrowRight), reset (R), speed slider (50ms–1000ms), scenario selector, policy selector, seed selector.
+     - Live Telemetry Panel: Tick counter, goal completion %, authoritative physical collision invariant (0), conflict attempts breakdown (vertex, swap, occupied, dynamic), deadlock events, and cumulative decision attribution.
+     - Scrolling live event stream logging step outcomes, recharges, conflicts, and deadlock resolutions.
+  4. *CLI Launcher (`run_viewer.py`):*
+     - Standard CLI launcher supporting `--host`, `--port`, `--scenario`, `--policy`, `--seed`, and `--no-browser`.
+  5. *Test Suite & Determinism Verification (`tests/test_web_viewer.py`):*
+     - 10 new unit and integration tests verifying session initialization, snapshot schema, step advancement, reset behavior, scenario selection (D04, U06, U14), policy modes, REST API endpoints over HTTP, authoritative determinism parity, and U14 full episode completion.
+     - Full test suite: **249 passed in 9.53s** (`python -m pytest`).
+     - Bit-for-bit identical trajectory parity confirmed between session interface and direct headless simulation.
+- **Launch Instructions:**
+  ```bash
+  # Launch the Live 2D Viewer on default port 8000 with D01 and hybrid_comm:
+  python run_viewer.py
+
+  # Launch with custom scenario, policy, seed, and port:
+  python run_viewer.py --scenario U14 --policy hybrid_comm --seed 42 --port 8080
+
+  # Launch headlessly without automatically opening a browser:
+  python run_viewer.py --no-browser
+  ```
+- **REST API Endpoints:**
+  - `GET /`: Serves the HTML5/Canvas/JS Single-Page Application.
+  - `GET /api/state`: Returns the full authoritative JSON snapshot of the simulation.
+  - `GET /api/scenarios`: Returns the catalog of selectable scenarios with metadata.
+  - `GET /api/policies`: Returns available coordination policies and descriptions.
+  - `GET /api/health`: Returns server status, current tick, and scenario ID.
+  - `POST /api/step`: Advances the simulation by exactly 1 tick and returns the new snapshot.
+  - `POST /api/reset`: Resets the current scenario to tick 0 and returns the snapshot.
+  - `POST /api/select`: Loads a chosen scenario (`{"scenario_id": "...", "seed": 42, "policy_mode": "..."}`).
+- **Files changed / added:**
+  - `worldsim/web_viewer.py` (new: authoritative simulation session, REST API handler, and multithreaded server)
+  - `worldsim/static/index.html` (new: HTML5 Canvas 2D visualization single-page application)
+  - `run_viewer.py` (new: CLI launcher script)
+  - `worldsim/__init__.py` (updated: exported `LiveViewerServer`, `SimulationSession`, `launch_web_viewer`)
+  - `tests/test_web_viewer.py` (new: 10 unit and integration tests)
+  - `WORLD_SIM_PLAN.md` (updated)
+  - `WORLD_SIM_HANDOFF.md` (updated)
+
 ## Latest update: Phase 14.4.2
 
 Phase 14.4.2 (U14 Final Audit and Baseline Freeze) completes a forensic divergence audit of Scenario U14 (Multi-Corner Blind Intersection), establishes why the hybrid controller succeeds where the remediated learned policy fails, verifies transparent metric computation, freezes the baseline, and adds dedicated regression tests:

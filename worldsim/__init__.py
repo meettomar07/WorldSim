@@ -73,6 +73,7 @@ from .robust_policy import (
     RouteComparison,
 )
 from .viewer import MultiAgentWorldViewer, WorldViewer
+from .web_viewer import LiveViewerServer, SimulationSession, launch_web_viewer
 
 __all__ = [
     "Action",
@@ -111,6 +112,7 @@ __all__ = [
     "LinearLearningConfig",
     "LinearLearningRunner",
     "LinearQLearner",
+    "LiveViewerServer",
     "MemoryEntry",
     "MultiAgentCoordinator",
     "MultiAgentExperimentMetrics",
@@ -136,6 +138,7 @@ __all__ = [
     "RobustResourcePolicy",
     "RouteComparison",
     "Simulation",
+    "SimulationSession",
     "StepResult",
     "WorldConfig",
     "WorldState",
@@ -143,6 +146,7 @@ __all__ = [
     "execute_energy_plan",
     "execute_plan",
     "jains_fairness_index",
+    "launch_web_viewer",
     "plan",
     "plan_energy",
     "run_all_multi_agent_experiments",
