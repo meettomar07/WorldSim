@@ -514,6 +514,173 @@ class TestDecentralizedLearning(unittest.TestCase):
             self.assertGreater(counts["learned"] + counts["safety_guard"], 0)
             self.assertIn(pols[aid].last_decision_mode, ("learned", "safety_guard"))
 
+    def test_u14_remediated_policy_doorway_deadlock_reproduction(self) -> None:
+        """14. Reproduce and assert the U14 doorway deadlock under remediated learned policy."""
+        from phase13_5_unseen_audit import build_all_unseen_scenarios
+
+        unseen = {s[0].scenario_id: s for s in build_all_unseen_scenarios()}
+        u14_spec, u14_pre = unseen["U14"]
+        u14_agents = [
+            AgentConfig(
+                id=a["id"],
+                initial_x=a["initial_x"],
+                initial_y=a["initial_y"],
+                initial_energy=a["initial_energy"],
+                target=Position(a["target_x"], a["target_y"]),
+            )
+            for a in u14_spec.active_agents
+        ] + [
+            AgentConfig(id=p.id, initial_x=p.x, initial_y=p.y, initial_energy=0, target=None)
+            for p in u14_pre
+        ]
+        aids = [a["id"] for a in u14_spec.active_agents]
+
+        learner = DecentralizedQLearner()
+        weights_path = Path("phase14_4_weights_comm.json")
+        if weights_path.exists():
+            learner.load_weights(weights_path)
+
+        w_cfg = MultiAgentWorldConfig(
+            width=u14_spec.width,
+            height=u14_spec.height,
+            agents=tuple(u14_agents),
+            resources=(),
+            max_energy=10,
+            enable_coordination=True,
+            coordination_mode="decentralized",
+            communication_radius=2.0,
+            sensory_radius=2.0,
+            collision_rule="priority_rotation",
+        )
+        sim = MultiAgentSimulation(w_cfg, seed=500)
+        pols = {
+            aid: LearnedCoordinationPolicy(
+                u14_spec.width,
+                u14_spec.height,
+                10,
+                2.0,
+                learner=learner,
+                enable_communication=True,
+                coordinator=sim.coordinator,
+                enable_safety_guard=True,
+            )
+            for aid in aids
+        }
+
+        total_blocked = 0
+        for _ in range(25):
+            if all(not sim.state.agents[aid].active for aid in aids):
+                break
+            if sim.coordinator:
+                sim.coordinator.reset_tick()
+            acts = {
+                aid: pols[aid].choose_action(sim.observe_agent(aid))
+                if sim.state.agents[aid].active
+                else Action.UP
+                for aid in aids
+            }
+            res = sim.step(acts)
+            total_blocked += res.occupied_collisions
+            for aid in aids:
+                r = res.agent_results[aid]
+                pols[aid].record_action_result(r.position_after, r.energy_after, r.action, r.success)
+
+        # Assert failure reproduction: agents remain locked at junction doorways
+        succ = all(not sim.state.agents[aid].active and sim.state.agents[aid].status == "reached_target" for aid in aids)
+        self.assertFalse(succ, "Remediated learned policy must honestly reproduce 0% completion on U14")
+        self.assertGreater(total_blocked, 25, "Agents must experience persistent doorway blocking")
+        # Assert transparent attribution: 100% of decisions were made by learned policy
+        for aid in aids:
+            self.assertEqual(pols[aid].decision_counts["safety_guard"], 0)
+            self.assertGreater(pols[aid].decision_counts["learned"], 0)
+
+    def test_u14_hybrid_policy_divergence_and_resolution(self) -> None:
+        """15. Verify that hybrid policy detects deadlock at tick 4, diverges, and achieves 100% completion."""
+        from phase13_5_unseen_audit import build_all_unseen_scenarios
+
+        unseen = {s[0].scenario_id: s for s in build_all_unseen_scenarios()}
+        u14_spec, u14_pre = unseen["U14"]
+        u14_agents = [
+            AgentConfig(
+                id=a["id"],
+                initial_x=a["initial_x"],
+                initial_y=a["initial_y"],
+                initial_energy=a["initial_energy"],
+                target=Position(a["target_x"], a["target_y"]),
+            )
+            for a in u14_spec.active_agents
+        ] + [
+            AgentConfig(id=p.id, initial_x=p.x, initial_y=p.y, initial_energy=0, target=None)
+            for p in u14_pre
+        ]
+        aids = [a["id"] for a in u14_spec.active_agents]
+
+        learner = DecentralizedQLearner()
+        weights_path = Path("phase14_4_weights_comm.json")
+        if weights_path.exists():
+            learner.load_weights(weights_path)
+
+        w_cfg = MultiAgentWorldConfig(
+            width=u14_spec.width,
+            height=u14_spec.height,
+            agents=tuple(u14_agents),
+            resources=(),
+            max_energy=10,
+            enable_coordination=True,
+            coordination_mode="decentralized",
+            communication_radius=2.0,
+            sensory_radius=2.0,
+            collision_rule="priority_rotation",
+        )
+        sim = MultiAgentSimulation(w_cfg, seed=500)
+        pols = {
+            aid: HybridCoordinationPolicy(
+                u14_spec.width,
+                u14_spec.height,
+                10,
+                2.0,
+                learner=learner,
+                enable_communication=True,
+                coordinator=sim.coordinator,
+            )
+            for aid in aids
+        }
+
+        tick_4_safety_invocations = 0
+        for t in range(25):
+            if all(not sim.state.agents[aid].active for aid in aids):
+                break
+            if sim.coordinator:
+                sim.coordinator.reset_tick()
+            acts = {}
+            for aid in aids:
+                if sim.state.agents[aid].active:
+                    acts[aid] = pols[aid].choose_action(sim.observe_agent(aid))
+                    if t == 4 and pols[aid].last_decision_mode == "safety_guard":
+                        tick_4_safety_invocations += 1
+                else:
+                    acts[aid] = Action.UP
+            res = sim.step(acts)
+            for aid in aids:
+                r = res.agent_results[aid]
+                pols[aid].record_action_result(r.position_after, r.energy_after, r.action, r.success)
+
+            # Safety invariant: physical double occupancy strictly zero at every step
+            live_positions = [sim.state.agents[aid].position for aid in aids if sim.state.agents[aid].active]
+            self.assertEqual(len(live_positions), len(set(live_positions)), "Zero physical overlaps invariant violated")
+
+        # Verify divergence occurred at tick 4
+        self.assertGreater(tick_4_safety_invocations, 0, "Safety guard must activate at tick 4 to resolve doorway deadlock")
+        # Verify 100% completion and zero exhaustions
+        for aid in aids:
+            self.assertNotEqual(sim.state.agents[aid].status, "exhausted", f"Agent {aid} exhausted")
+            self.assertEqual(sim.state.agents[aid].status, "reached_target", f"Agent {aid} failed to reach target")
+        # Verify decision attribution transparency
+        total_safety = sum(pols[aid].decision_counts["safety_guard"] for aid in aids)
+        total_learned = sum(pols[aid].decision_counts["learned"] for aid in aids)
+        self.assertGreater(total_safety, 0, "Safety guard decisions must be recorded")
+        self.assertGreater(total_learned, 0, "Learned decisions must be recorded")
+
 
 if __name__ == "__main__":
     unittest.main()
