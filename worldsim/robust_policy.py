@@ -405,7 +405,11 @@ class ResourceUtilityEvaluator:
         aid = getattr(observation, "agent_id", None)
         if self.coordinator is not None and len(utilities) > 1:
             def util_rank(u: ResourceUtility) -> float:
-                load = self.coordinator.get_resource_load(u.resource.position, exclude_agent=aid)
+                load = self.coordinator.get_resource_load(
+                    u.resource.position,
+                    exclude_agent=aid,
+                    querying_agent_pos=pos,
+                )
                 return u.utility_score - (load * 30.0)
             best_util = max(utilities, key=util_rank) if utilities else None
         else:
@@ -903,6 +907,6 @@ class RobustResourcePolicy:
                 best_action = alt
 
             dest = dest_map.get(best_action, pos)
-            self.coordinator.register_intent(aid, dest, rec_target)
+            self.coordinator.register_intent(aid, dest, rec_target, current_position=pos)
 
         return best_action

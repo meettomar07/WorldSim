@@ -1,5 +1,43 @@
 # WorldSim Handoff
 
+## Latest update: Phase 14.2
+
+Phase 14.2 (Local-Horizon Coordination) implements and benchmarks an experimental decentralized coordination mode where agents share intentions, coordinate right-of-way, and inspect resource load strictly within a local sensory radius of $R = 2.0$ (Euclidean distance $\le 2.0$), while preserving the existing centralized mode as the default baseline:
+- **Core Targeted Improvements:**
+  1. *Coordination Mode & Scoped Perception Architecture:*
+     - Added `coordination_mode` (`"centralized"` vs `"decentralized"`, default `"centralized"`) and `communication_radius` (default `2.0`) to `MultiAgentWorldConfig` and `MultiAgentCoordinator`.
+     - In decentralized mode, `get_visible_peers(agent_id, pos, current_positions)` scopes visible intentions and position updates strictly to peers within Euclidean distance $\le 2.0$.
+     - Scoped obstacle awareness: In decentralized mode, agents plan and resolve conflicts strictly using their own local obstacle memory (`pol.memory.get_known_obstacles()` / `exhausted_positions`), avoiding leakage of the coordinator's global obstacle pool.
+     - Preserved authoritative environment physics: physical bounces and collision resolution remain strictly enforced by the simulation engine, ensuring zero illegal double-occupancy or wall clipping when unobserved distant agents encounter one another.
+  2. *Comprehensive Empirical Benchmark (32 Scenarios):*
+     - **Baseline Benchmark (16 Scenarios):** All 13 feasible baseline scenarios achieve **100.0% completion** in decentralized mode, matching centralized mode exactly. All 3 infeasible baseline scenarios (4A, 5A, 8) honestly achieve 0.0% completion with 100% exhaustion in both modes.
+     - **Unseen Generalization (16 Scenarios):** 12 of 14 feasible unseen scenarios (U01–U05, U07–U10, U12–U13, U15) achieve **100.0% completion** in decentralized mode. Both infeasible unseen scenarios (U11, U16) honestly achieve 0.0% completion in both modes.
+     - **Collision Separation:** Verified zero illegal movements across all 32 scenarios. Actual collisions (`vertex + swap`) are separated from benign blocked attempts (`occupied`).
+     - True structural deadlocks remained 0 across all feasible baseline scenarios.
+  3. *Forensic Causal Analysis of Local-Horizon Regressions (< 95% Completion):*
+     - **U06 (8-Agent Staggered Quadrant Mesh) — 0.0% Decentralized vs 100.0% Centralized:**
+       - *Causal Mechanism:* **Resource Queue Blindness** (Invisible Distant Contention).
+       - *Explanation:* In decentralized mode ($R=2.0$), agents in Quadrant 1 cannot observe Quadrant 4 agents committing to the distant recharge pad at (5, 5) ($\text{dist} = 5.0 > 2.0$). Seeing its local pad at (2, 2) occupied (`load = 1`), `agent_q1_a` falsely infers that (5, 5) is uncontested (`load = 0`). The raw static utility formula awards (5, 5) a higher unpenalized score (110.5 vs 69.0). `agent_q1_a` abandons its safe local doorstep with only 7 energy, ventures 7 steps across the board toward (5, 5), and exhausts mid-grid.
+     - **U14 (Multi-Corner Blind Intersection) — 0.0% Decentralized vs 100.0% Centralized:**
+       - *Causal Mechanism:* **Hidden Intentions & Stale/Localized Obstacle Beliefs** (Horizon Blindness at Blind Junctions).
+       - *Explanation:* At the 1-cell intersection (3, 3), blind corner pillars exist at (2, 2), (4, 2), (2, 4), (4, 4). Centralized mode pooled all 4 pillars globally, allowing `is_crossroad` to recognize the junction and grant clearance right-of-way to the vehicle inside (3, 3). In decentralized mode ($R=2.0$), `agent_e` at (4, 3) cannot observe the opposite western pillars at (2, 2) and (2, 4) ($\text{dist} = \sqrt{5} \approx 2.24 > 2.0$). Because `is_crossroad` requires all 4 diagonal pillars, it evaluates to `False`. Failing to recognize the shared junction, `agent_e` asserts priority rotation against `agent_w`, resulting in opposing head-on bounce and cyclic deadlock at the neck.
+- **Benchmark & Test Suite Verification:**
+  - Dedicated unit test suite `tests/test_local_horizon_coordination.py`: 11 tests covering local scoping, intention hiding, horizon boundaries, obstacle memory isolation, TTL expiration, swap resolution, and physical bounce integrity.
+  - Full test suite: **210 passed in 5.45s** (`python -m pytest`).
+  - Benchmarks and reports: `phase14_2_benchmark_results.json` and `phase14_2_local_horizon_report.md`.
+
+Files changed / added:
+- `worldsim/multi_agent.py` (updated: added `coordination_mode` and `communication_radius` to `MultiAgentWorldConfig`, passed to coordinator)
+- `worldsim/coordination.py` (updated: scoped visible peers, scoped obstacle memory, scoped resource load to $R \le 2.0$)
+- `worldsim/robust_policy.py` (updated: passed current position and querying agent position to coordinator)
+- `phase13_5_unseen_audit.py` (updated: added `coordination_mode: str = "centralized"` argument)
+- `tests/test_local_horizon_coordination.py` (new test suite: 11 tests for local-horizon coordination)
+- `phase14_2_local_horizon_eval.py` (new evaluation harness running all 32 scenarios under centralized and decentralized modes)
+- `phase14_2_benchmark_results.json` (new artifact: structured evaluation metrics)
+- `phase14_2_local_horizon_report.md` (new artifact: comprehensive comparison audit report)
+- `WORLD_SIM_PLAN.md` (updated)
+- `WORLD_SIM_HANDOFF.md` (updated)
+
 ## Latest update: Phase 14.1
 
 Phase 14.1 (Determinism & Telemetry Cleanup) completes the foundational cleanup of the multi-agent coordination layer before decentralized learning:

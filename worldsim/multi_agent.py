@@ -72,6 +72,8 @@ class MultiAgentWorldConfig:
     congestion_safety_margin: int = 0
     goal_criterion: str = "individual"  # "individual", "shared_any", "shared_all", "shared_subset"
     required_goal_count: int = 1
+    coordination_mode: str = "centralized"  # "centralized" or "decentralized"
+    communication_radius: float = 2.0  # Communication/sensory radius for local horizon
 
     def __post_init__(self) -> None:
         if self.width <= 0 or self.height <= 0:
@@ -82,6 +84,10 @@ class MultiAgentWorldConfig:
             raise ValueError("max_energy and movement_energy_cost must be positive.")
         if self.sensory_radius <= 0:
             raise ValueError("sensory_radius must be positive.")
+        if self.communication_radius <= 0:
+            raise ValueError("communication_radius must be positive.")
+        if self.coordination_mode not in {"centralized", "decentralized"}:
+            raise ValueError("coordination_mode must be 'centralized' or 'decentralized'.")
         if self.collision_rule not in {"bounce", "priority", "priority_rotation"}:
             raise ValueError("collision_rule must be 'bounce', 'priority', or 'priority_rotation'.")
         if self.resource_allocation_rule not in {
@@ -269,6 +275,8 @@ class MultiAgentSimulation:
             enabled=config.enable_coordination,
             world_width=config.width,
             world_height=config.height,
+            coordination_mode=getattr(config, "coordination_mode", "centralized"),
+            communication_radius=getattr(config, "communication_radius", 2.0),
         )
         self.fairness_monitor = FairnessMonitor(agent_ids=[a.id for a in config.agents])
 
