@@ -1,0 +1,598 @@
+{
+  "version": "13.2",
+  "scenarios": [
+    {
+      "experiment_name": "Scenario 1A: Eight-Agent Bottleneck (Phase 13 Baseline)",
+      "description": "8 agents funneling into central resources (pure bounce, lowest_id)",
+      "episodes": 20,
+      "agent_ids": [
+        "agent_1",
+        "agent_2",
+        "agent_3",
+        "agent_4",
+        "agent_5",
+        "agent_6",
+        "agent_7",
+        "agent_8"
+      ],
+      "per_agent_success_rate": {
+        "agent_1": 0.0,
+        "agent_2": 0.0,
+        "agent_3": 0.0,
+        "agent_4": 0.0,
+        "agent_5": 0.0,
+        "agent_6": 0.0,
+        "agent_7": 0.0,
+        "agent_8": 100.0
+      },
+      "overall_completion_rate": 0.0,
+      "mean_steps_to_goal": 0.0,
+      "mean_episode_duration": 50.0,
+      "mean_energy_consumed": 0.0,
+      "total_energy_consumed": 0,
+      "resource_consumption_count": 0,
+      "per_agent_recharges": {
+        "agent_1": 0.0,
+        "agent_2": 0.0,
+        "agent_3": 0.0,
+        "agent_4": 0.0,
+        "agent_5": 0.0,
+        "agent_6": 0.0,
+        "agent_7": 0.0,
+        "agent_8": 0.0
+      },
+      "vertex_collisions": 3760,
+      "swap_collisions": 0,
+      "occupied_collisions": 1000,
+      "total_collisions": 4760,
+      "resource_contentions": 0,
+      "deadlock_detections": 4560,
+      "recovery_attempts": 4560,
+      "successful_recoveries": 20,
+      "unresolved_deadlocks": 4540,
+      "mean_ticks_blocked": 238.0,
+      "starvation_events": 4520,
+      "exhaustion_rates": {
+        "agent_1": 0.0,
+        "agent_2": 100.0,
+        "agent_3": 0.0,
+        "agent_4": 0.0,
+        "agent_5": 100.0,
+        "agent_6": 0.0,
+        "agent_7": 0.0,
+        "agent_8": 0.0
+      },
+      "timeout_rates": {
+        "agent_1": 100.0,
+        "agent_2": 0.0,
+        "agent_3": 100.0,
+        "agent_4": 100.0,
+        "agent_5": 0.0,
+        "agent_6": 100.0,
+        "agent_7": 100.0,
+        "agent_8": 0.0
+      },
+      "jains_fairness_goal": 0.125,
+      "jains_fairness_energy": 1.0,
+      "resource_load_distribution": {},
+      "unused_resources_count": 2
+    },
+    {
+      "experiment_name": "Scenario 1B: Eight-Agent Bottleneck (Phase 13.1 Configuration)",
+      "description": "8 agents with priority rotation and basic coordination (margin=0)",
+      "episodes": 20,
+      "agent_ids": [
+        "agent_1",
+        "agent_2",
+        "agent_3",
+        "agent_4",
+        "agent_5",
+        "agent_6",
+        "agent_7",
+        "agent_8"
+      ],
+      "per_agent_success_rate": {
+        "agent_1": 0.0,
+        "agent_2": 0.0,
+        "agent_3": 100.0,
+        "agent_4": 0.0,
+        "agent_5": 50.0,
+        "agent_6": 100.0,
+        "agent_7": 50.0,
+        "agent_8": 100.0
+      },
+      "overall_completion_rate": 0.0,
+      "mean_steps_to_goal": 0.0,
+      "mean_episode_duration": 50.0,
+      "mean_energy_consumed": 53.5,
+      "total_energy_consumed": 1070,
+      "resource_consumption_count": 0,
+      "per_agent_recharges": {
+        "agent_1": 3.0,
+        "agent_2": 1.25,
+        "agent_3": 1.0,
+        "agent_4": 1.0,
+        "agent_5": 1.0,
+        "agent_6": 1.0,
+        "agent_7": 1.0,
+        "agent_8": 0.0
+      },
+      "vertex_collisions": 270,
+      "swap_collisions": 880,
+      "occupied_collisions": 645,
+      "total_collisions": 1795,
+      "resource_contentions": 180,
+      "deadlock_detections": 515,
+      "recovery_attempts": 515,
+      "successful_recoveries": 440,
+      "unresolved_deadlocks": 75,
+      "mean_ticks_blocked": 89.75,
+      "starvation_events": 1555,
+      "exhaustion_rates": {
+        "agent_1": 25.0,
+        "agent_2": 100.0,
+        "agent_3": 0.0,
+        "agent_4": 25.0,
+        "agent_5": 50.0,
+        "agent_6": 0.0,
+        "agent_7": 25.0,
+        "agent_8": 0.0
+      },
+      "timeout_rates": {
+        "agent_1": 75.0,
+        "agent_2": 0.0,
+        "agent_3": 0.0,
+        "agent_4": 75.0,
+        "agent_5": 0.0,
+        "agent_6": 0.0,
+        "agent_7": 25.0,
+        "agent_8": 0.0
+      },
+      "jains_fairness_goal": 0.5,
+      "jains_fairness_energy": 0.7294,
+      "resource_load_distribution": {
+        "(3,3)": 100,
+        "(4,4)": 85
+      },
+      "unused_resources_count": 0
+    },
+    {
+      "experiment_name": "Scenario 1C: Eight-Agent Bottleneck (Phase 13.2 Resolved)",
+      "description": "8 agents with multi-recharge capacity, doorstep queuing, and load balancing",
+      "episodes": 20,
+      "agent_ids": [
+        "agent_1",
+        "agent_2",
+        "agent_3",
+        "agent_4",
+        "agent_5",
+        "agent_6",
+        "agent_7",
+        "agent_8"
+      ],
+      "per_agent_success_rate": {
+        "agent_1": 0.0,
+        "agent_2": 55.00000000000001,
+        "agent_3": 50.0,
+        "agent_4": 50.0,
+        "agent_5": 100.0,
+        "agent_6": 100.0,
+        "agent_7": 50.0,
+        "agent_8": 100.0
+      },
+      "overall_completion_rate": 0.0,
+      "mean_steps_to_goal": 0.0,
+      "mean_episode_duration": 48.85,
+      "mean_energy_consumed": 90.8,
+      "total_energy_consumed": 1816,
+      "resource_consumption_count": 0,
+      "per_agent_recharges": {
+        "agent_1": 6.8,
+        "agent_2": 3.8,
+        "agent_3": 1.0,
+        "agent_4": 1.0,
+        "agent_5": 2.0,
+        "agent_6": 1.0,
+        "agent_7": 1.0,
+        "agent_8": 1.0
+      },
+      "vertex_collisions": 243,
+      "swap_collisions": 18,
+      "occupied_collisions": 460,
+      "total_collisions": 721,
+      "resource_contentions": 233,
+      "deadlock_detections": 387,
+      "recovery_attempts": 387,
+      "successful_recoveries": 387,
+      "unresolved_deadlocks": 0,
+      "mean_ticks_blocked": 36.05,
+      "starvation_events": 481,
+      "exhaustion_rates": {
+        "agent_1": 5.0,
+        "agent_2": 0.0,
+        "agent_3": 50.0,
+        "agent_4": 50.0,
+        "agent_5": 0.0,
+        "agent_6": 0.0,
+        "agent_7": 50.0,
+        "agent_8": 0.0
+      },
+      "timeout_rates": {
+        "agent_1": 95.0,
+        "agent_2": 45.0,
+        "agent_3": 0.0,
+        "agent_4": 0.0,
+        "agent_5": 0.0,
+        "agent_6": 0.0,
+        "agent_7": 0.0,
+        "agent_8": 0.0
+      },
+      "jains_fairness_goal": 0.6312,
+      "jains_fairness_energy": 0.5769,
+      "resource_load_distribution": {
+        "(3,3)": 160,
+        "(4,4)": 192
+      },
+      "unused_resources_count": 0
+    },
+    {
+      "experiment_name": "Scenario 2: Four-Agent Cross Congestion Regression",
+      "description": "4-way intersection regression confirming 100% completion maintained",
+      "episodes": 20,
+      "agent_ids": [
+        "agent_1",
+        "agent_2",
+        "agent_3",
+        "agent_4"
+      ],
+      "per_agent_success_rate": {
+        "agent_1": 100.0,
+        "agent_2": 100.0,
+        "agent_3": 100.0,
+        "agent_4": 100.0
+      },
+      "overall_completion_rate": 100.0,
+      "mean_steps_to_goal": 10.0,
+      "mean_episode_duration": 10.0,
+      "mean_energy_consumed": 20.0,
+      "total_energy_consumed": 400,
+      "resource_consumption_count": 0,
+      "per_agent_recharges": {
+        "agent_1": 1.0,
+        "agent_2": 1.0,
+        "agent_3": 1.0,
+        "agent_4": 1.0
+      },
+      "vertex_collisions": 60,
+      "swap_collisions": 0,
+      "occupied_collisions": 40,
+      "total_collisions": 100,
+      "resource_contentions": 40,
+      "deadlock_detections": 40,
+      "recovery_attempts": 40,
+      "successful_recoveries": 40,
+      "unresolved_deadlocks": 0,
+      "mean_ticks_blocked": 5.0,
+      "starvation_events": 20,
+      "exhaustion_rates": {
+        "agent_1": 0.0,
+        "agent_2": 0.0,
+        "agent_3": 0.0,
+        "agent_4": 0.0
+      },
+      "timeout_rates": {
+        "agent_1": 0.0,
+        "agent_2": 0.0,
+        "agent_3": 0.0,
+        "agent_4": 0.0
+      },
+      "jains_fairness_goal": 1.0,
+      "jains_fairness_energy": 1.0,
+      "resource_load_distribution": {
+        "(2,2)": 40,
+        "(3,3)": 40
+      },
+      "unused_resources_count": 0
+    },
+    {
+      "experiment_name": "Scenario 3A: Resource Competition (Lowest-ID)",
+      "description": "Two agents competing for consumable resource under lowest_id",
+      "episodes": 30,
+      "agent_ids": [
+        "agent_1",
+        "agent_2"
+      ],
+      "per_agent_success_rate": {
+        "agent_1": 100.0,
+        "agent_2": 0.0
+      },
+      "overall_completion_rate": 0.0,
+      "mean_steps_to_goal": 0.0,
+      "mean_episode_duration": 6.0,
+      "mean_energy_consumed": 6.0,
+      "total_energy_consumed": 180,
+      "resource_consumption_count": 30,
+      "per_agent_recharges": {
+        "agent_1": 1.0,
+        "agent_2": 0.0
+      },
+      "vertex_collisions": 30,
+      "swap_collisions": 0,
+      "occupied_collisions": 30,
+      "total_collisions": 60,
+      "resource_contentions": 0,
+      "deadlock_detections": 30,
+      "recovery_attempts": 30,
+      "successful_recoveries": 30,
+      "unresolved_deadlocks": 0,
+      "mean_ticks_blocked": 2.0,
+      "starvation_events": 0,
+      "exhaustion_rates": {
+        "agent_1": 0.0,
+        "agent_2": 100.0
+      },
+      "timeout_rates": {
+        "agent_1": 0.0,
+        "agent_2": 0.0
+      },
+      "jains_fairness_goal": 0.5,
+      "jains_fairness_energy": 0.5,
+      "resource_load_distribution": {
+        "(1,1)": 30
+      },
+      "unused_resources_count": 0
+    },
+    {
+      "experiment_name": "Scenario 3B: Resource Competition (Fair Balanced)",
+      "description": "Two agents competing for consumable resource under fair_balanced",
+      "episodes": 30,
+      "agent_ids": [
+        "agent_1",
+        "agent_2"
+      ],
+      "per_agent_success_rate": {
+        "agent_1": 100.0,
+        "agent_2": 0.0
+      },
+      "overall_completion_rate": 0.0,
+      "mean_steps_to_goal": 0.0,
+      "mean_episode_duration": 6.0,
+      "mean_energy_consumed": 6.0,
+      "total_energy_consumed": 180,
+      "resource_consumption_count": 30,
+      "per_agent_recharges": {
+        "agent_1": 1.0,
+        "agent_2": 0.0
+      },
+      "vertex_collisions": 30,
+      "swap_collisions": 0,
+      "occupied_collisions": 30,
+      "total_collisions": 60,
+      "resource_contentions": 30,
+      "deadlock_detections": 30,
+      "recovery_attempts": 30,
+      "successful_recoveries": 30,
+      "unresolved_deadlocks": 0,
+      "mean_ticks_blocked": 2.0,
+      "starvation_events": 0,
+      "exhaustion_rates": {
+        "agent_1": 0.0,
+        "agent_2": 100.0
+      },
+      "timeout_rates": {
+        "agent_1": 0.0,
+        "agent_2": 0.0
+      },
+      "jains_fairness_goal": 0.5,
+      "jains_fairness_energy": 0.5,
+      "resource_load_distribution": {
+        "(1,1)": 30
+      },
+      "unused_resources_count": 0
+    },
+    {
+      "experiment_name": "Scenario 4: New 8-Agent Layout with Asymmetric Resource Positions",
+      "description": "8 agents with resources relocated to (2, 5) and (5, 2)",
+      "episodes": 20,
+      "agent_ids": [
+        "agent_1",
+        "agent_2",
+        "agent_3",
+        "agent_4",
+        "agent_5",
+        "agent_6",
+        "agent_7",
+        "agent_8"
+      ],
+      "per_agent_success_rate": {
+        "agent_1": 0.0,
+        "agent_2": 0.0,
+        "agent_3": 50.0,
+        "agent_4": 100.0,
+        "agent_5": 50.0,
+        "agent_6": 100.0,
+        "agent_7": 100.0,
+        "agent_8": 100.0
+      },
+      "overall_completion_rate": 0.0,
+      "mean_steps_to_goal": 0.0,
+      "mean_episode_duration": 37.0,
+      "mean_energy_consumed": 44.0,
+      "total_energy_consumed": 880,
+      "resource_consumption_count": 0,
+      "per_agent_recharges": {
+        "agent_1": 0.0,
+        "agent_2": 2.0,
+        "agent_3": 1.0,
+        "agent_4": 1.0,
+        "agent_5": 2.0,
+        "agent_6": 1.0,
+        "agent_7": 1.0,
+        "agent_8": 0.0
+      },
+      "vertex_collisions": 120,
+      "swap_collisions": 620,
+      "occupied_collisions": 260,
+      "total_collisions": 1000,
+      "resource_contentions": 50,
+      "deadlock_detections": 110,
+      "recovery_attempts": 110,
+      "successful_recoveries": 110,
+      "unresolved_deadlocks": 0,
+      "mean_ticks_blocked": 50.0,
+      "starvation_events": 810,
+      "exhaustion_rates": {
+        "agent_1": 100.0,
+        "agent_2": 50.0,
+        "agent_3": 50.0,
+        "agent_4": 0.0,
+        "agent_5": 0.0,
+        "agent_6": 0.0,
+        "agent_7": 0.0,
+        "agent_8": 0.0
+      },
+      "timeout_rates": {
+        "agent_1": 0.0,
+        "agent_2": 50.0,
+        "agent_3": 0.0,
+        "agent_4": 0.0,
+        "agent_5": 50.0,
+        "agent_6": 0.0,
+        "agent_7": 0.0,
+        "agent_8": 0.0
+      },
+      "jains_fairness_goal": 0.625,
+      "jains_fairness_energy": 0.7035,
+      "resource_load_distribution": {
+        "(5,2)": 110,
+        "(2,5)": 50
+      },
+      "unused_resources_count": 0
+    },
+    {
+      "experiment_name": "Scenario 5: 8-Agent Asymmetric Start Positions",
+      "description": "8 agents starting in opposing corners funneling across central intersection",
+      "episodes": 20,
+      "agent_ids": [
+        "agent_1",
+        "agent_2",
+        "agent_3",
+        "agent_4",
+        "agent_5",
+        "agent_6",
+        "agent_7",
+        "agent_8"
+      ],
+      "per_agent_success_rate": {
+        "agent_1": 100.0,
+        "agent_2": 0.0,
+        "agent_3": 0.0,
+        "agent_4": 100.0,
+        "agent_5": 100.0,
+        "agent_6": 100.0,
+        "agent_7": 100.0,
+        "agent_8": 100.0
+      },
+      "overall_completion_rate": 0.0,
+      "mean_steps_to_goal": 0.0,
+      "mean_episode_duration": 21.0,
+      "mean_energy_consumed": 58.0,
+      "total_energy_consumed": 1160,
+      "resource_consumption_count": 0,
+      "per_agent_recharges": {
+        "agent_1": 2.0,
+        "agent_2": 0.0,
+        "agent_3": 0.0,
+        "agent_4": 2.0,
+        "agent_5": 2.0,
+        "agent_6": 2.0,
+        "agent_7": 2.0,
+        "agent_8": 2.0
+      },
+      "vertex_collisions": 195,
+      "swap_collisions": 10,
+      "occupied_collisions": 205,
+      "total_collisions": 410,
+      "resource_contentions": 185,
+      "deadlock_detections": 200,
+      "recovery_attempts": 200,
+      "successful_recoveries": 200,
+      "unresolved_deadlocks": 0,
+      "mean_ticks_blocked": 20.5,
+      "starvation_events": 190,
+      "exhaustion_rates": {
+        "agent_1": 0.0,
+        "agent_2": 100.0,
+        "agent_3": 100.0,
+        "agent_4": 0.0,
+        "agent_5": 0.0,
+        "agent_6": 0.0,
+        "agent_7": 0.0,
+        "agent_8": 0.0
+      },
+      "timeout_rates": {
+        "agent_1": 0.0,
+        "agent_2": 0.0,
+        "agent_3": 0.0,
+        "agent_4": 0.0,
+        "agent_5": 0.0,
+        "agent_6": 0.0,
+        "agent_7": 0.0,
+        "agent_8": 0.0
+      },
+      "jains_fairness_goal": 0.75,
+      "jains_fairness_energy": 0.7482,
+      "resource_load_distribution": {
+        "(3,3)": 120,
+        "(4,4)": 120
+      },
+      "unused_resources_count": 0
+    },
+    {
+      "experiment_name": "Scenario 6: Intentionally Infeasible Environment",
+      "description": "Overconstrained parameters where target and resource are mathematically unreachable",
+      "episodes": 20,
+      "agent_ids": [
+        "agent_1",
+        "agent_2"
+      ],
+      "per_agent_success_rate": {
+        "agent_1": 0.0,
+        "agent_2": 0.0
+      },
+      "overall_completion_rate": 0.0,
+      "mean_steps_to_goal": 0.0,
+      "mean_episode_duration": 2.0,
+      "mean_energy_consumed": 0.0,
+      "total_energy_consumed": 0,
+      "resource_consumption_count": 0,
+      "per_agent_recharges": {
+        "agent_1": 0.0,
+        "agent_2": 0.0
+      },
+      "vertex_collisions": 0,
+      "swap_collisions": 0,
+      "occupied_collisions": 0,
+      "total_collisions": 0,
+      "resource_contentions": 0,
+      "deadlock_detections": 0,
+      "recovery_attempts": 0,
+      "successful_recoveries": 0,
+      "unresolved_deadlocks": 0,
+      "mean_ticks_blocked": 0.0,
+      "starvation_events": 0,
+      "exhaustion_rates": {
+        "agent_1": 100.0,
+        "agent_2": 100.0
+      },
+      "timeout_rates": {
+        "agent_1": 0.0,
+        "agent_2": 0.0
+      },
+      "jains_fairness_goal": 1.0,
+      "jains_fairness_energy": 1.0,
+      "resource_load_distribution": {},
+      "unused_resources_count": 1
+    }
+  ]
+}

@@ -1,0 +1,491 @@
+{
+  "version": "13.0",
+  "experiments": [
+    {
+      "experiment_name": "Experiment A: Single-Agent Control",
+      "description": "1 agent baseline matching Phase 12.2",
+      "episodes": 50,
+      "agent_ids": [
+        "agent_1"
+      ],
+      "per_agent_success_rate": {
+        "agent_1": 100.0
+      },
+      "overall_completion_rate": 100.0,
+      "mean_steps_to_goal": 7,
+      "mean_episode_duration": 7,
+      "mean_energy_consumed": 6,
+      "total_energy_consumed": 300,
+      "resource_consumption_count": 50,
+      "per_agent_recharges": {
+        "agent_1": 1
+      },
+      "vertex_collisions": 0,
+      "swap_collisions": 0,
+      "occupied_collisions": 0,
+      "total_collisions": 0,
+      "resource_contentions": 0,
+      "exhaustion_rates": {
+        "agent_1": 0.0
+      },
+      "timeout_rates": {
+        "agent_1": 0.0
+      },
+      "jains_fairness_index": 1.0,
+      "cooperative_completion_time": 7
+    },
+    {
+      "experiment_name": "Experiment B: Multiple Independent Agents",
+      "description": "2 agents with distinct goals and resources",
+      "episodes": 50,
+      "agent_ids": [
+        "agent_1",
+        "agent_2"
+      ],
+      "per_agent_success_rate": {
+        "agent_1": 100.0,
+        "agent_2": 100.0
+      },
+      "overall_completion_rate": 100.0,
+      "mean_steps_to_goal": 3,
+      "mean_episode_duration": 3,
+      "mean_energy_consumed": 6,
+      "total_energy_consumed": 300,
+      "resource_consumption_count": 0,
+      "per_agent_recharges": {
+        "agent_1": 0,
+        "agent_2": 0
+      },
+      "vertex_collisions": 0,
+      "swap_collisions": 0,
+      "occupied_collisions": 0,
+      "total_collisions": 0,
+      "resource_contentions": 0,
+      "exhaustion_rates": {
+        "agent_1": 0.0,
+        "agent_2": 0.0
+      },
+      "timeout_rates": {
+        "agent_1": 0.0,
+        "agent_2": 0.0
+      },
+      "jains_fairness_index": 1.0,
+      "cooperative_completion_time": 3
+    },
+    {
+      "experiment_name": "Experiment C: Resource Competition",
+      "description": "2 agents competing for 1 scarce consumable resource",
+      "episodes": 50,
+      "agent_ids": [
+        "agent_1",
+        "agent_2"
+      ],
+      "per_agent_success_rate": {
+        "agent_1": 100.0,
+        "agent_2": 0.0
+      },
+      "overall_completion_rate": 0.0,
+      "mean_steps_to_goal": 0.0,
+      "mean_episode_duration": 8,
+      "mean_energy_consumed": 7,
+      "total_energy_consumed": 350,
+      "resource_consumption_count": 50,
+      "per_agent_recharges": {
+        "agent_1": 1,
+        "agent_2": 0
+      },
+      "vertex_collisions": 0,
+      "swap_collisions": 0,
+      "occupied_collisions": 0,
+      "total_collisions": 0,
+      "resource_contentions": 0,
+      "exhaustion_rates": {
+        "agent_1": 0.0,
+        "agent_2": 100.0
+      },
+      "timeout_rates": {
+        "agent_1": 0.0,
+        "agent_2": 0.0
+      },
+      "jains_fairness_index": 0.5,
+      "cooperative_completion_time": null
+    },
+    {
+      "experiment_name": "Experiment D: Movement Conflicts",
+      "description": "Symmetric head-on swap collision and bounce",
+      "episodes": 50,
+      "agent_ids": [
+        "agent_1",
+        "agent_2"
+      ],
+      "per_agent_success_rate": {
+        "agent_1": 100.0,
+        "agent_2": 100.0
+      },
+      "overall_completion_rate": 100.0,
+      "mean_steps_to_goal": 5,
+      "mean_episode_duration": 5,
+      "mean_energy_consumed": 6,
+      "total_energy_consumed": 300,
+      "resource_consumption_count": 0,
+      "per_agent_recharges": {
+        "agent_1": 0,
+        "agent_2": 0
+      },
+      "vertex_collisions": 0,
+      "swap_collisions": 200,
+      "occupied_collisions": 0,
+      "total_collisions": 200,
+      "resource_contentions": 0,
+      "exhaustion_rates": {
+        "agent_1": 0.0,
+        "agent_2": 0.0
+      },
+      "timeout_rates": {
+        "agent_1": 0.0,
+        "agent_2": 0.0
+      },
+      "jains_fairness_index": 1.0,
+      "cooperative_completion_time": 5
+    },
+    {
+      "experiment_name": "Experiment E: Shared Goals",
+      "description": "Shared goal where arrival by any agent satisfies completion",
+      "episodes": 50,
+      "agent_ids": [
+        "agent_1",
+        "agent_2"
+      ],
+      "per_agent_success_rate": {
+        "agent_1": 0.0,
+        "agent_2": 100.0
+      },
+      "overall_completion_rate": 100.0,
+      "mean_steps_to_goal": 4,
+      "mean_episode_duration": 4,
+      "mean_energy_consumed": 8,
+      "total_energy_consumed": 400,
+      "resource_consumption_count": 0,
+      "per_agent_recharges": {
+        "agent_1": 0,
+        "agent_2": 0
+      },
+      "vertex_collisions": 0,
+      "swap_collisions": 0,
+      "occupied_collisions": 0,
+      "total_collisions": 0,
+      "resource_contentions": 0,
+      "exhaustion_rates": {
+        "agent_1": 100.0,
+        "agent_2": 0.0
+      },
+      "timeout_rates": {
+        "agent_1": 0.0,
+        "agent_2": 0.0
+      },
+      "jains_fairness_index": 0.5,
+      "cooperative_completion_time": 4
+    },
+    {
+      "experiment_name": "Experiment F1: Isolated Exploration",
+      "description": "Isolated sensory observations without sharing",
+      "episodes": 30,
+      "agent_ids": [
+        "agent_1",
+        "agent_2"
+      ],
+      "per_agent_success_rate": {
+        "agent_1": 100.0,
+        "agent_2": 0.0
+      },
+      "overall_completion_rate": 0.0,
+      "mean_steps_to_goal": 0.0,
+      "mean_episode_duration": 10,
+      "mean_energy_consumed": 9,
+      "total_energy_consumed": 270,
+      "resource_consumption_count": 0,
+      "per_agent_recharges": {
+        "agent_1": 1,
+        "agent_2": 0
+      },
+      "vertex_collisions": 0,
+      "swap_collisions": 0,
+      "occupied_collisions": 0,
+      "total_collisions": 0,
+      "resource_contentions": 0,
+      "exhaustion_rates": {
+        "agent_1": 0.0,
+        "agent_2": 100.0
+      },
+      "timeout_rates": {
+        "agent_1": 0.0,
+        "agent_2": 0.0
+      },
+      "jains_fairness_index": 0.5,
+      "cooperative_completion_time": null
+    },
+    {
+      "experiment_name": "Experiment F2: Cooperative Discovery Sharing",
+      "description": "Shared discovery pool for observed resources",
+      "episodes": 30,
+      "agent_ids": [
+        "agent_1",
+        "agent_2"
+      ],
+      "per_agent_success_rate": {
+        "agent_1": 100.0,
+        "agent_2": 100.0
+      },
+      "overall_completion_rate": 100.0,
+      "mean_steps_to_goal": 14,
+      "mean_episode_duration": 14,
+      "mean_energy_consumed": 12,
+      "total_energy_consumed": 360,
+      "resource_consumption_count": 0,
+      "per_agent_recharges": {
+        "agent_1": 1,
+        "agent_2": 1
+      },
+      "vertex_collisions": 0,
+      "swap_collisions": 0,
+      "occupied_collisions": 0,
+      "total_collisions": 0,
+      "resource_contentions": 0,
+      "exhaustion_rates": {
+        "agent_1": 0.0,
+        "agent_2": 0.0
+      },
+      "timeout_rates": {
+        "agent_1": 0.0,
+        "agent_2": 0.0
+      },
+      "jains_fairness_index": 1.0,
+      "cooperative_completion_time": 14
+    },
+    {
+      "experiment_name": "Experiment G: Policy Comparison",
+      "description": "Robust policy vs Random policy in same environment",
+      "episodes": 50,
+      "agent_ids": [
+        "agent_robust",
+        "agent_random"
+      ],
+      "per_agent_success_rate": {
+        "agent_robust": 100.0,
+        "agent_random": 0.0
+      },
+      "overall_completion_rate": 0.0,
+      "mean_steps_to_goal": 0.0,
+      "mean_episode_duration": 7,
+      "mean_energy_consumed": 9,
+      "total_energy_consumed": 450,
+      "resource_consumption_count": 50,
+      "per_agent_recharges": {
+        "agent_robust": 1,
+        "agent_random": 0
+      },
+      "vertex_collisions": 0,
+      "swap_collisions": 0,
+      "occupied_collisions": 0,
+      "total_collisions": 0,
+      "resource_contentions": 0,
+      "exhaustion_rates": {
+        "agent_robust": 0.0,
+        "agent_random": 100.0
+      },
+      "timeout_rates": {
+        "agent_robust": 0.0,
+        "agent_random": 0.0
+      },
+      "jains_fairness_index": 0.5,
+      "cooperative_completion_time": null
+    },
+    {
+      "experiment_name": "Experiment H: Scaling (1 Agents)",
+      "description": "Scaling to 1 simultaneous agents on 8x8 grid",
+      "episodes": 30,
+      "agent_ids": [
+        "agent_1"
+      ],
+      "per_agent_success_rate": {
+        "agent_1": 100.0
+      },
+      "overall_completion_rate": 100.0,
+      "mean_steps_to_goal": 16,
+      "mean_episode_duration": 16,
+      "mean_energy_consumed": 10,
+      "total_energy_consumed": 300,
+      "resource_consumption_count": 0,
+      "per_agent_recharges": {
+        "agent_1": 2
+      },
+      "vertex_collisions": 0,
+      "swap_collisions": 0,
+      "occupied_collisions": 0,
+      "total_collisions": 0,
+      "resource_contentions": 0,
+      "exhaustion_rates": {
+        "agent_1": 0.0
+      },
+      "timeout_rates": {
+        "agent_1": 0.0
+      },
+      "jains_fairness_index": 1.0,
+      "cooperative_completion_time": 16
+    },
+    {
+      "experiment_name": "Experiment H: Scaling (2 Agents)",
+      "description": "Scaling to 2 simultaneous agents on 8x8 grid",
+      "episodes": 30,
+      "agent_ids": [
+        "agent_1",
+        "agent_2"
+      ],
+      "per_agent_success_rate": {
+        "agent_1": 100.0,
+        "agent_2": 100.0
+      },
+      "overall_completion_rate": 100.0,
+      "mean_steps_to_goal": 17,
+      "mean_episode_duration": 17,
+      "mean_energy_consumed": 20,
+      "total_energy_consumed": 600,
+      "resource_consumption_count": 0,
+      "per_agent_recharges": {
+        "agent_1": 2,
+        "agent_2": 1
+      },
+      "vertex_collisions": 0,
+      "swap_collisions": 0,
+      "occupied_collisions": 30,
+      "total_collisions": 30,
+      "resource_contentions": 0,
+      "exhaustion_rates": {
+        "agent_1": 0.0,
+        "agent_2": 0.0
+      },
+      "timeout_rates": {
+        "agent_1": 0.0,
+        "agent_2": 0.0
+      },
+      "jains_fairness_index": 1.0,
+      "cooperative_completion_time": 17
+    },
+    {
+      "experiment_name": "Experiment H: Scaling (4 Agents)",
+      "description": "Scaling to 4 simultaneous agents on 8x8 grid",
+      "episodes": 30,
+      "agent_ids": [
+        "agent_1",
+        "agent_2",
+        "agent_3",
+        "agent_4"
+      ],
+      "per_agent_success_rate": {
+        "agent_1": 0.0,
+        "agent_2": 100.0,
+        "agent_3": 100.0,
+        "agent_4": 100.0
+      },
+      "overall_completion_rate": 0.0,
+      "mean_steps_to_goal": 0.0,
+      "mean_episode_duration": 14,
+      "mean_energy_consumed": 30,
+      "total_energy_consumed": 900,
+      "resource_consumption_count": 0,
+      "per_agent_recharges": {
+        "agent_1": 0,
+        "agent_2": 1,
+        "agent_3": 1,
+        "agent_4": 1
+      },
+      "vertex_collisions": 60,
+      "swap_collisions": 0,
+      "occupied_collisions": 60,
+      "total_collisions": 120,
+      "resource_contentions": 0,
+      "exhaustion_rates": {
+        "agent_1": 100.0,
+        "agent_2": 0.0,
+        "agent_3": 0.0,
+        "agent_4": 0.0
+      },
+      "timeout_rates": {
+        "agent_1": 0.0,
+        "agent_2": 0.0,
+        "agent_3": 0.0,
+        "agent_4": 0.0
+      },
+      "jains_fairness_index": 0.75,
+      "cooperative_completion_time": null
+    },
+    {
+      "experiment_name": "Experiment H: Scaling (8 Agents)",
+      "description": "Scaling to 8 simultaneous agents on 8x8 grid",
+      "episodes": 30,
+      "agent_ids": [
+        "agent_1",
+        "agent_2",
+        "agent_3",
+        "agent_4",
+        "agent_5",
+        "agent_6",
+        "agent_7",
+        "agent_8"
+      ],
+      "per_agent_success_rate": {
+        "agent_1": 0.0,
+        "agent_2": 0.0,
+        "agent_3": 0.0,
+        "agent_4": 0.0,
+        "agent_5": 0.0,
+        "agent_6": 0.0,
+        "agent_7": 100.0,
+        "agent_8": 100.0
+      },
+      "overall_completion_rate": 0.0,
+      "mean_steps_to_goal": 0.0,
+      "mean_episode_duration": 40,
+      "mean_energy_consumed": 57,
+      "total_energy_consumed": 1710,
+      "resource_consumption_count": 0,
+      "per_agent_recharges": {
+        "agent_1": 0,
+        "agent_2": 0,
+        "agent_3": 0,
+        "agent_4": 3,
+        "agent_5": 0,
+        "agent_6": 0,
+        "agent_7": 1,
+        "agent_8": 0
+      },
+      "vertex_collisions": 480,
+      "swap_collisions": 0,
+      "occupied_collisions": 570,
+      "total_collisions": 1050,
+      "resource_contentions": 0,
+      "exhaustion_rates": {
+        "agent_1": 100.0,
+        "agent_2": 100.0,
+        "agent_3": 100.0,
+        "agent_4": 0.0,
+        "agent_5": 100.0,
+        "agent_6": 100.0,
+        "agent_7": 0.0,
+        "agent_8": 0.0
+      },
+      "timeout_rates": {
+        "agent_1": 0.0,
+        "agent_2": 0.0,
+        "agent_3": 0.0,
+        "agent_4": 100.0,
+        "agent_5": 0.0,
+        "agent_6": 0.0,
+        "agent_7": 0.0,
+        "agent_8": 0.0
+      },
+      "jains_fairness_index": 0.25,
+      "cooperative_completion_time": null
+    }
+  ]
+}

@@ -1,0 +1,1017 @@
+{
+  "unseen_scenarios_count": 16,
+  "scenarios": [
+    {
+      "scenario_id": "U01",
+      "experiment_name": "U01: Double Corridor with Central Bottleneck (4 Agents)",
+      "family": "Layout Topologies",
+      "description": "Two 1-wide horizontal corridors separated by an obstacle barrier with a single central opening at (3, 1). Two opposing agent pairs must traverse without swap locking.",
+      "feasibility": "FEASIBLE",
+      "feasibility_proof": "Distance from (0, 0) to (6, 0) is 6. With detour through central portal (3, 1), path is 8 steps. Initial energy 10 >= 8. Geometrically and energetically feasible.",
+      "width": 7,
+      "height": 3,
+      "active_agents": [
+        {
+          "id": "agent_nw",
+          "initial_x": 0,
+          "initial_y": 0,
+          "initial_energy": 10,
+          "target_x": 6,
+          "target_y": 0
+        },
+        {
+          "id": "agent_sw",
+          "initial_x": 0,
+          "initial_y": 2,
+          "initial_energy": 10,
+          "target_x": 6,
+          "target_y": 2
+        },
+        {
+          "id": "agent_ne",
+          "initial_x": 6,
+          "initial_y": 0,
+          "initial_energy": 10,
+          "target_x": 0,
+          "target_y": 0
+        },
+        {
+          "id": "agent_se",
+          "initial_x": 6,
+          "initial_y": 2,
+          "initial_energy": 10,
+          "target_x": 0,
+          "target_y": 2
+        }
+      ],
+      "pre_positioned": [
+        {
+          "id": "wall_1",
+          "x": 1,
+          "y": 1,
+          "status": "exhausted"
+        },
+        {
+          "id": "wall_2",
+          "x": 2,
+          "y": 1,
+          "status": "exhausted"
+        },
+        {
+          "id": "wall_3",
+          "x": 4,
+          "y": 1,
+          "status": "exhausted"
+        },
+        {
+          "id": "wall_4",
+          "x": 5,
+          "y": 1,
+          "status": "exhausted"
+        }
+      ],
+      "resources": [],
+      "max_energy": 10,
+      "collision_rule": "priority_rotation",
+      "resource_allocation_rule": "fair_balanced",
+      "enable_coordination": true
+    },
+    {
+      "scenario_id": "U02",
+      "experiment_name": "U02: Dual T-Junction Crossway (4 Agents)",
+      "family": "Layout Topologies",
+      "description": "H-shaped dual T-junction layout where row 2 is blocked, forcing perpendicular crossing traffic through (1, 2) and (5, 2).",
+      "feasibility": "FEASIBLE",
+      "feasibility_proof": "Distances for horizontal agents (0, 1)->(6, 1) and (6, 3)->(0, 3) are 6. Vertical agents (1, 0)->(1, 4) and (5, 4)->(5, 0) are 4. Initial energy 10 >= 6. Solvable without resource visits.",
+      "width": 7,
+      "height": 5,
+      "active_agents": [
+        {
+          "id": "agent_h1",
+          "initial_x": 0,
+          "initial_y": 1,
+          "initial_energy": 10,
+          "target_x": 6,
+          "target_y": 1
+        },
+        {
+          "id": "agent_h2",
+          "initial_x": 6,
+          "initial_y": 3,
+          "initial_energy": 10,
+          "target_x": 0,
+          "target_y": 3
+        },
+        {
+          "id": "agent_v1",
+          "initial_x": 1,
+          "initial_y": 0,
+          "initial_energy": 10,
+          "target_x": 1,
+          "target_y": 4
+        },
+        {
+          "id": "agent_v2",
+          "initial_x": 5,
+          "initial_y": 4,
+          "initial_energy": 10,
+          "target_x": 5,
+          "target_y": 0
+        }
+      ],
+      "pre_positioned": [
+        {
+          "id": "obs_c1",
+          "x": 2,
+          "y": 2,
+          "status": "exhausted"
+        },
+        {
+          "id": "obs_c2",
+          "x": 3,
+          "y": 2,
+          "status": "exhausted"
+        },
+        {
+          "id": "obs_c3",
+          "x": 4,
+          "y": 2,
+          "status": "exhausted"
+        },
+        {
+          "id": "obs_p1",
+          "x": 0,
+          "y": 2,
+          "status": "exhausted"
+        },
+        {
+          "id": "obs_p2",
+          "x": 6,
+          "y": 2,
+          "status": "exhausted"
+        }
+      ],
+      "resources": [],
+      "max_energy": 10,
+      "collision_rule": "priority_rotation",
+      "resource_allocation_rule": "fair_balanced",
+      "enable_coordination": true
+    },
+    {
+      "scenario_id": "U03",
+      "experiment_name": "U03: Cul-de-Sac with Alternative Perimeter Bypass (2 Agents)",
+      "family": "Layout Topologies",
+      "description": "Row 1 dead-ends at (2, 1) due to solid wall at (3, 1), forcing Agent 1 to backtrack/detour via row 2/3 to reach (5, 1).",
+      "feasibility": "FEASIBLE",
+      "feasibility_proof": "Path (0, 1)->(2, 1)->(2, 2)->(3, 2)->(4, 2)->(5, 2)->(5, 1) requires 8 steps. Initial energy 12 >= 8. Agent 2 moves (5, 2)->(0, 2) (5 steps). Solvable.",
+      "width": 6,
+      "height": 4,
+      "active_agents": [
+        {
+          "id": "agent_seeker",
+          "initial_x": 0,
+          "initial_y": 1,
+          "initial_energy": 12,
+          "target_x": 5,
+          "target_y": 1
+        },
+        {
+          "id": "agent_counter",
+          "initial_x": 5,
+          "initial_y": 2,
+          "initial_energy": 12,
+          "target_x": 0,
+          "target_y": 2
+        }
+      ],
+      "pre_positioned": [
+        {
+          "id": "wall_c1",
+          "x": 3,
+          "y": 0,
+          "status": "exhausted"
+        },
+        {
+          "id": "wall_c2",
+          "x": 3,
+          "y": 1,
+          "status": "exhausted"
+        }
+      ],
+      "resources": [],
+      "max_energy": 12,
+      "collision_rule": "priority_rotation",
+      "resource_allocation_rule": "fair_balanced",
+      "enable_coordination": true
+    },
+    {
+      "scenario_id": "U04",
+      "experiment_name": "U04: Tripartite Reciprocal Swap Loop (3 Agents)",
+      "family": "Multi-Agent Formations",
+      "description": "3 agents arranged in a triangular cycle: A1->A2's start, A2->A3's start, A3->A1's start. Tests 3-way rotational deadlock resolution.",
+      "feasibility": "FEASIBLE",
+      "feasibility_proof": "Distances are 2 to 3. Initial energy 8 is ample. An orthogonal sidestep by any agent allows the cyclic rotation to resolve in <= 5 steps.",
+      "width": 5,
+      "height": 5,
+      "active_agents": [
+        {
+          "id": "agent_1",
+          "initial_x": 1,
+          "initial_y": 2,
+          "initial_energy": 8,
+          "target_x": 3,
+          "target_y": 2
+        },
+        {
+          "id": "agent_2",
+          "initial_x": 3,
+          "initial_y": 2,
+          "initial_energy": 8,
+          "target_x": 2,
+          "target_y": 3
+        },
+        {
+          "id": "agent_3",
+          "initial_x": 2,
+          "initial_y": 3,
+          "initial_energy": 8,
+          "target_x": 1,
+          "target_y": 2
+        }
+      ],
+      "pre_positioned": [],
+      "resources": [],
+      "max_energy": 8,
+      "collision_rule": "priority_rotation",
+      "resource_allocation_rule": "fair_balanced",
+      "enable_coordination": true
+    },
+    {
+      "scenario_id": "U05",
+      "experiment_name": "U05: Hexagonal Concentric Convergence (6 Agents)",
+      "family": "Multi-Agent Formations",
+      "description": "6 agents starting along perimeter cells converging toward center and crossing to opposite sides with 2 reusable resources.",
+      "feasibility": "FEASIBLE",
+      "feasibility_proof": "Direct distances are 6 to 8. Initial energy 10 >= 8. Reusable resources at (2, 3) and (4, 3) provide replenishment if queuing delays occur.",
+      "width": 7,
+      "height": 7,
+      "active_agents": [
+        {
+          "id": "agent_n",
+          "initial_x": 3,
+          "initial_y": 0,
+          "initial_energy": 10,
+          "target_x": 3,
+          "target_y": 6
+        },
+        {
+          "id": "agent_s",
+          "initial_x": 3,
+          "initial_y": 6,
+          "initial_energy": 10,
+          "target_x": 3,
+          "target_y": 0
+        },
+        {
+          "id": "agent_w",
+          "initial_x": 0,
+          "initial_y": 3,
+          "initial_energy": 10,
+          "target_x": 6,
+          "target_y": 3
+        },
+        {
+          "id": "agent_e",
+          "initial_x": 6,
+          "initial_y": 3,
+          "initial_energy": 10,
+          "target_x": 0,
+          "target_y": 3
+        },
+        {
+          "id": "agent_nw",
+          "initial_x": 1,
+          "initial_y": 1,
+          "initial_energy": 10,
+          "target_x": 5,
+          "target_y": 5
+        },
+        {
+          "id": "agent_se",
+          "initial_x": 5,
+          "initial_y": 5,
+          "initial_energy": 10,
+          "target_x": 1,
+          "target_y": 1
+        }
+      ],
+      "pre_positioned": [],
+      "resources": [
+        {
+          "x": 2,
+          "y": 3,
+          "recharge_amount": 6,
+          "consumable": false
+        },
+        {
+          "x": 4,
+          "y": 3,
+          "recharge_amount": 6,
+          "consumable": false
+        }
+      ],
+      "max_energy": 10,
+      "collision_rule": "priority_rotation",
+      "resource_allocation_rule": "fair_balanced",
+      "enable_coordination": true
+    },
+    {
+      "scenario_id": "U06",
+      "experiment_name": "U06: 8-Agent Staggered Quadrant Mesh (8 Agents)",
+      "family": "Multi-Agent Formations",
+      "description": "8 agents in pairs in each grid quadrant crossing diagonally with 4 distributed reusable resources.",
+      "feasibility": "FEASIBLE",
+      "feasibility_proof": "Diagonal target distance is 10. Corner to nearest quadrant resource is distance 2. Initial energy 8 reaches resource in 2 steps with 6 energy remaining, recharges to 10, and completes remaining 8 steps.",
+      "width": 8,
+      "height": 8,
+      "active_agents": [
+        {
+          "id": "agent_q1_a",
+          "initial_x": 1,
+          "initial_y": 1,
+          "initial_energy": 8,
+          "target_x": 6,
+          "target_y": 6
+        },
+        {
+          "id": "agent_q1_b",
+          "initial_x": 2,
+          "initial_y": 1,
+          "initial_energy": 8,
+          "target_x": 5,
+          "target_y": 6
+        },
+        {
+          "id": "agent_q2_a",
+          "initial_x": 6,
+          "initial_y": 1,
+          "initial_energy": 8,
+          "target_x": 1,
+          "target_y": 6
+        },
+        {
+          "id": "agent_q2_b",
+          "initial_x": 5,
+          "initial_y": 1,
+          "initial_energy": 8,
+          "target_x": 2,
+          "target_y": 6
+        },
+        {
+          "id": "agent_q3_a",
+          "initial_x": 1,
+          "initial_y": 6,
+          "initial_energy": 8,
+          "target_x": 6,
+          "target_y": 1
+        },
+        {
+          "id": "agent_q3_b",
+          "initial_x": 2,
+          "initial_y": 6,
+          "initial_energy": 8,
+          "target_x": 5,
+          "target_y": 1
+        },
+        {
+          "id": "agent_q4_a",
+          "initial_x": 6,
+          "initial_y": 6,
+          "initial_energy": 8,
+          "target_x": 1,
+          "target_y": 1
+        },
+        {
+          "id": "agent_q4_b",
+          "initial_x": 5,
+          "initial_y": 6,
+          "initial_energy": 8,
+          "target_x": 2,
+          "target_y": 1
+        }
+      ],
+      "pre_positioned": [],
+      "resources": [
+        {
+          "x": 2,
+          "y": 2,
+          "recharge_amount": 6,
+          "consumable": false
+        },
+        {
+          "x": 5,
+          "y": 2,
+          "recharge_amount": 6,
+          "consumable": false
+        },
+        {
+          "x": 2,
+          "y": 5,
+          "recharge_amount": 6,
+          "consumable": false
+        },
+        {
+          "x": 5,
+          "y": 5,
+          "recharge_amount": 6,
+          "consumable": false
+        }
+      ],
+      "max_energy": 10,
+      "collision_rule": "priority_rotation",
+      "resource_allocation_rule": "fair_balanced",
+      "enable_coordination": true
+    },
+    {
+      "scenario_id": "U07",
+      "experiment_name": "U07: Sequential Goal-Cell Chain in 1-Wide Corridor (3 Agents)",
+      "family": "Completed Agent Traversal",
+      "description": "A 1-wide corridor along row 1 with sequential goals at (3, 1), (4, 1), (5, 1). Later agents must step through earlier completed agents' goal cells.",
+      "feasibility": "FEASIBLE",
+      "feasibility_proof": "Goal-cell yielding permits active agents to step through cells of agents with status reached_target. Distances are 3, 5, 7. Initial energy 10 >= 7. Solvable in sequential order.",
+      "width": 6,
+      "height": 3,
+      "active_agents": [
+        {
+          "id": "agent_short",
+          "initial_x": 0,
+          "initial_y": 2,
+          "initial_energy": 10,
+          "target_x": 3,
+          "target_y": 1
+        },
+        {
+          "id": "agent_mid",
+          "initial_x": 0,
+          "initial_y": 0,
+          "initial_energy": 10,
+          "target_x": 4,
+          "target_y": 1
+        },
+        {
+          "id": "agent_long",
+          "initial_x": 0,
+          "initial_y": 1,
+          "initial_energy": 10,
+          "target_x": 5,
+          "target_y": 1
+        }
+      ],
+      "pre_positioned": [
+        {
+          "id": "wall_n1",
+          "x": 2,
+          "y": 0,
+          "status": "exhausted"
+        },
+        {
+          "id": "wall_n2",
+          "x": 3,
+          "y": 0,
+          "status": "exhausted"
+        },
+        {
+          "id": "wall_n3",
+          "x": 4,
+          "y": 0,
+          "status": "exhausted"
+        },
+        {
+          "id": "wall_s1",
+          "x": 2,
+          "y": 2,
+          "status": "exhausted"
+        },
+        {
+          "id": "wall_s2",
+          "x": 3,
+          "y": 2,
+          "status": "exhausted"
+        },
+        {
+          "id": "wall_s3",
+          "x": 4,
+          "y": 2,
+          "status": "exhausted"
+        }
+      ],
+      "resources": [],
+      "max_energy": 10,
+      "collision_rule": "priority_rotation",
+      "resource_allocation_rule": "fair_balanced",
+      "enable_coordination": true
+    },
+    {
+      "scenario_id": "U08",
+      "experiment_name": "U08: Completed Agent at Critical Chokepoint (2 Agents)",
+      "family": "Completed Agent Traversal",
+      "description": "A completed resting agent sits at the only chokepoint (2, 1). Active agent at (0, 1) targeting (4, 1) must traverse directly through it.",
+      "feasibility": "FEASIBLE",
+      "feasibility_proof": "Direct line (0, 1) to (4, 1) is 4 steps. With goal-cell yielding, resting agent at (2, 1) yields right-of-way. Energy 8 >= 4. Solvable in exactly 4 steps.",
+      "width": 5,
+      "height": 3,
+      "active_agents": [
+        {
+          "id": "agent_active",
+          "initial_x": 0,
+          "initial_y": 1,
+          "initial_energy": 8,
+          "target_x": 4,
+          "target_y": 1
+        }
+      ],
+      "pre_positioned": [
+        {
+          "id": "choke_n",
+          "x": 2,
+          "y": 0,
+          "status": "exhausted"
+        },
+        {
+          "id": "choke_s",
+          "x": 2,
+          "y": 2,
+          "status": "exhausted"
+        },
+        {
+          "id": "agent_resting",
+          "x": 2,
+          "y": 1,
+          "status": "reached_target"
+        }
+      ],
+      "resources": [],
+      "max_energy": 8,
+      "collision_rule": "priority_rotation",
+      "resource_allocation_rule": "fair_balanced",
+      "enable_coordination": true
+    },
+    {
+      "scenario_id": "U09",
+      "experiment_name": "U09: Multi-Agent Competition for Scarce Single Reusable Resource (4 Agents)",
+      "family": "Resource & Energy",
+      "description": "4 agents starting at corners of 5x5 world targeting opposite corners (dist=8). Initial energy E=5 cannot reach target directly. All 4 must sequentially recharge at single central resource (2, 2).",
+      "feasibility": "FEASIBLE",
+      "feasibility_proof": "Distance from every corner (0,0), (0,4), (4,0), (4,4) to center (2,2) is 4 <= 5. Energy remaining is 1, recharges to 7, distance to target is 4 <= 7. Fair-Balanced arbitration guarantees sequential access.",
+      "width": 5,
+      "height": 5,
+      "active_agents": [
+        {
+          "id": "agent_c1",
+          "initial_x": 0,
+          "initial_y": 0,
+          "initial_energy": 5,
+          "target_x": 4,
+          "target_y": 4
+        },
+        {
+          "id": "agent_c2",
+          "initial_x": 0,
+          "initial_y": 4,
+          "initial_energy": 5,
+          "target_x": 4,
+          "target_y": 0
+        },
+        {
+          "id": "agent_c3",
+          "initial_x": 4,
+          "initial_y": 0,
+          "initial_energy": 5,
+          "target_x": 0,
+          "target_y": 4
+        },
+        {
+          "id": "agent_c4",
+          "initial_x": 4,
+          "initial_y": 4,
+          "initial_energy": 5,
+          "target_x": 0,
+          "target_y": 0
+        }
+      ],
+      "pre_positioned": [],
+      "resources": [
+        {
+          "x": 2,
+          "y": 2,
+          "recharge_amount": 6,
+          "consumable": false
+        }
+      ],
+      "max_energy": 8,
+      "collision_rule": "priority_rotation",
+      "resource_allocation_rule": "fair_balanced",
+      "enable_coordination": true
+    },
+    {
+      "scenario_id": "U10",
+      "experiment_name": "U10: Deceptive Shortest Path (Shortest Route Starves, Detour Recharges) (2 Agents)",
+      "family": "Resource & Energy",
+      "description": "Straight path to goal is distance 6, but agent has energy 5 (direct movement exhausts). Agent must detour to resource at (2, 4) (dist=4), recharge to 7, and reach goal.",
+      "feasibility": "FEASIBLE",
+      "feasibility_proof": "Direct dist=6 > E=5. Detour to (2, 4) is dist=4 <= 5. Recharges to 7. From (2, 4) to (6, 2) is dist=6 <= 7. Total steps 10. Energetically solvable only via detour.",
+      "width": 7,
+      "height": 5,
+      "active_agents": [
+        {
+          "id": "agent_east",
+          "initial_x": 0,
+          "initial_y": 2,
+          "initial_energy": 5,
+          "target_x": 6,
+          "target_y": 2
+        },
+        {
+          "id": "agent_west",
+          "initial_x": 6,
+          "initial_y": 2,
+          "initial_energy": 5,
+          "target_x": 0,
+          "target_y": 2
+        }
+      ],
+      "pre_positioned": [],
+      "resources": [
+        {
+          "x": 2,
+          "y": 4,
+          "recharge_amount": 6,
+          "consumable": false
+        },
+        {
+          "x": 4,
+          "y": 0,
+          "recharge_amount": 6,
+          "consumable": false
+        }
+      ],
+      "max_energy": 8,
+      "collision_rule": "priority_rotation",
+      "resource_allocation_rule": "fair_balanced",
+      "enable_coordination": true
+    },
+    {
+      "scenario_id": "U11",
+      "experiment_name": "U11: Rigorously Infeasible Layout \u2014 Geometric & Energy Disconnect (2 Agents)",
+      "family": "Resource & Energy",
+      "description": "Agents start at (0, 0) and (0, 1) with energy 3. Nearest resource is at (4, 4) (dist=8 > 3) and target at (7, 7) (dist=14 > 3). Mathematically impossible.",
+      "feasibility": "INFEASIBLE",
+      "feasibility_proof": "Mathematical proof: At each step, distance to any cell can decrease by at most 1. With initial energy 3, maximum reachable Manhattan distance is 3. Since min(dist to resource, dist to target) = 8 > 3, every possible action sequence exhausts at step 3.",
+      "width": 8,
+      "height": 8,
+      "active_agents": [
+        {
+          "id": "agent_1",
+          "initial_x": 0,
+          "initial_y": 0,
+          "initial_energy": 3,
+          "target_x": 7,
+          "target_y": 7
+        },
+        {
+          "id": "agent_2",
+          "initial_x": 0,
+          "initial_y": 1,
+          "initial_energy": 3,
+          "target_x": 7,
+          "target_y": 6
+        }
+      ],
+      "pre_positioned": [],
+      "resources": [
+        {
+          "x": 4,
+          "y": 4,
+          "recharge_amount": 6,
+          "consumable": false
+        }
+      ],
+      "max_energy": 10,
+      "collision_rule": "priority_rotation",
+      "resource_allocation_rule": "fair_balanced",
+      "enable_coordination": true
+    },
+    {
+      "scenario_id": "U12",
+      "experiment_name": "U12: Disappearing & Reappearing Obstacle Memory Stress Test (2 Agents)",
+      "family": "Partial Observation",
+      "description": "Agent 1 at (0, 2) targeting (7, 2). Obstacle at (3, 2) is visible at (1, 2) (dist=2.0), prompting detour to (1, 1). At (1, 1), obstacle drops outside sensory range (dist=2.24 > 2.0). Agent must remember obstacle across sensory horizon.",
+      "feasibility": "FEASIBLE",
+      "feasibility_proof": "Detour via row 1: (0,2)->(1,2)->(1,1)->(2,1)->(3,1)->(4,1)->(5,1)->(5,2)->(7,2) is 9 steps. Initial energy 12 >= 9. Energetically and geometrically solvable.",
+      "width": 8,
+      "height": 5,
+      "active_agents": [
+        {
+          "id": "agent_traveler",
+          "initial_x": 0,
+          "initial_y": 2,
+          "initial_energy": 12,
+          "target_x": 7,
+          "target_y": 2
+        },
+        {
+          "id": "agent_counter",
+          "initial_x": 7,
+          "initial_y": 4,
+          "initial_energy": 12,
+          "target_x": 0,
+          "target_y": 4
+        }
+      ],
+      "pre_positioned": [
+        {
+          "id": "obs_blind",
+          "x": 3,
+          "y": 2,
+          "status": "exhausted"
+        }
+      ],
+      "resources": [],
+      "max_energy": 12,
+      "collision_rule": "priority_rotation",
+      "resource_allocation_rule": "fair_balanced",
+      "enable_coordination": true
+    },
+    {
+      "scenario_id": "U13",
+      "experiment_name": "U13: Stale Obstacle Memory Expiration (TTL Revalidation) (1 Agent)",
+      "family": "Partial Observation",
+      "description": "Agent starts at (0, 1) targeting (11, 1). Early obstacle at (2, 1) prompts detour to row 3. Long journey along row 3 (16 steps) exceeds TTL=15, testing that expired obstacle memory is purged without corrupted state.",
+      "feasibility": "FEASIBLE",
+      "feasibility_proof": "Path along row 3 from x=0 to x=11 and back to y=1 takes 15 steps. Initial energy 20 >= 15. Solvable.",
+      "width": 12,
+      "height": 4,
+      "active_agents": [
+        {
+          "id": "agent_long_route",
+          "initial_x": 0,
+          "initial_y": 1,
+          "initial_energy": 20,
+          "target_x": 11,
+          "target_y": 1
+        }
+      ],
+      "pre_positioned": [
+        {
+          "id": "obs_early",
+          "x": 2,
+          "y": 1,
+          "status": "exhausted"
+        }
+      ],
+      "resources": [],
+      "max_energy": 20,
+      "collision_rule": "priority_rotation",
+      "resource_allocation_rule": "fair_balanced",
+      "enable_coordination": true
+    },
+    {
+      "scenario_id": "U14",
+      "experiment_name": "U14: Multi-Corner Blind Intersection (4 Agents)",
+      "family": "Partial Observation",
+      "description": "4 solid obstacle pillars surround central junction (3, 3) at distance 1.41. 4 agents approach blind corners from N, S, E, W.",
+      "feasibility": "FEASIBLE",
+      "feasibility_proof": "Straight paths across junction (3, 0)->(3, 6), (3, 6)->(3, 0), (0, 3)->(6, 3), (6, 3)->(0, 3) are 6 steps. Initial energy 10 >= 6. Priority rotation resolves right-of-way cleanly.",
+      "width": 7,
+      "height": 7,
+      "active_agents": [
+        {
+          "id": "agent_n",
+          "initial_x": 3,
+          "initial_y": 0,
+          "initial_energy": 10,
+          "target_x": 3,
+          "target_y": 6
+        },
+        {
+          "id": "agent_s",
+          "initial_x": 3,
+          "initial_y": 6,
+          "initial_energy": 10,
+          "target_x": 3,
+          "target_y": 0
+        },
+        {
+          "id": "agent_w",
+          "initial_x": 0,
+          "initial_y": 3,
+          "initial_energy": 10,
+          "target_x": 6,
+          "target_y": 3
+        },
+        {
+          "id": "agent_e",
+          "initial_x": 6,
+          "initial_y": 3,
+          "initial_energy": 10,
+          "target_x": 0,
+          "target_y": 3
+        }
+      ],
+      "pre_positioned": [
+        {
+          "id": "blind_nw",
+          "x": 2,
+          "y": 2,
+          "status": "exhausted"
+        },
+        {
+          "id": "blind_ne",
+          "x": 4,
+          "y": 2,
+          "status": "exhausted"
+        },
+        {
+          "id": "blind_sw",
+          "x": 2,
+          "y": 4,
+          "status": "exhausted"
+        },
+        {
+          "id": "blind_se",
+          "x": 4,
+          "y": 4,
+          "status": "exhausted"
+        }
+      ],
+      "resources": [],
+      "max_energy": 10,
+      "collision_rule": "priority_rotation",
+      "resource_allocation_rule": "fair_balanced",
+      "enable_coordination": true
+    },
+    {
+      "scenario_id": "U15",
+      "experiment_name": "U15: 6-Agent Asymmetric Funnel with Reusable Centers (6 Agents)",
+      "family": "Scaled Topologies",
+      "description": "6 agents in opposing 3v3 north/south formation funneled through center with 2 reusable resources at (3, 3) and (4, 4).",
+      "feasibility": "FEASIBLE",
+      "feasibility_proof": "Direct vertical distance is 7. Initial energy 10 >= 7. Resources at center provide recharge padding if door-step congestion occurs. Geometrically solvable.",
+      "width": 8,
+      "height": 8,
+      "active_agents": [
+        {
+          "id": "agent_n1",
+          "initial_x": 1,
+          "initial_y": 0,
+          "initial_energy": 10,
+          "target_x": 1,
+          "target_y": 7
+        },
+        {
+          "id": "agent_n2",
+          "initial_x": 3,
+          "initial_y": 0,
+          "initial_energy": 10,
+          "target_x": 3,
+          "target_y": 7
+        },
+        {
+          "id": "agent_n3",
+          "initial_x": 5,
+          "initial_y": 0,
+          "initial_energy": 10,
+          "target_x": 5,
+          "target_y": 7
+        },
+        {
+          "id": "agent_s1",
+          "initial_x": 2,
+          "initial_y": 7,
+          "initial_energy": 10,
+          "target_x": 2,
+          "target_y": 0
+        },
+        {
+          "id": "agent_s2",
+          "initial_x": 4,
+          "initial_y": 7,
+          "initial_energy": 10,
+          "target_x": 4,
+          "target_y": 0
+        },
+        {
+          "id": "agent_s3",
+          "initial_x": 6,
+          "initial_y": 7,
+          "initial_energy": 10,
+          "target_x": 6,
+          "target_y": 0
+        }
+      ],
+      "pre_positioned": [
+        {
+          "id": "wall_w1",
+          "x": 0,
+          "y": 3,
+          "status": "exhausted"
+        },
+        {
+          "id": "wall_w2",
+          "x": 0,
+          "y": 4,
+          "status": "exhausted"
+        },
+        {
+          "id": "wall_e1",
+          "x": 7,
+          "y": 3,
+          "status": "exhausted"
+        },
+        {
+          "id": "wall_e2",
+          "x": 7,
+          "y": 4,
+          "status": "exhausted"
+        }
+      ],
+      "resources": [
+        {
+          "x": 3,
+          "y": 3,
+          "recharge_amount": 6,
+          "consumable": false
+        },
+        {
+          "x": 4,
+          "y": 4,
+          "recharge_amount": 6,
+          "consumable": false
+        }
+      ],
+      "max_energy": 10,
+      "collision_rule": "priority_rotation",
+      "resource_allocation_rule": "fair_balanced",
+      "enable_coordination": true
+    },
+    {
+      "scenario_id": "U16",
+      "experiment_name": "U16: Rigorously Infeasible Layout \u2014 Sealed Cul-de-Sac (2 Agents)",
+      "family": "Scaled Topologies",
+      "description": "A solid wall of exhausted agents spans the entire grid height from (4, 0) to (4, 3). Targets (5, 1) and (5, 2) are completely sealed behind the wall.",
+      "feasibility": "INFEASIBLE",
+      "feasibility_proof": "Mathematical proof: Exhausted agents are impassable physical obstacles. The line of exhausted agents at x=4 spans all y from 0 to height-1=3. No grid coordinate (x > 4) is connected to any coordinate (x < 4). Goal is topologically unreachable from any start position.",
+      "width": 6,
+      "height": 4,
+      "active_agents": [
+        {
+          "id": "agent_1",
+          "initial_x": 0,
+          "initial_y": 1,
+          "initial_energy": 10,
+          "target_x": 5,
+          "target_y": 1
+        },
+        {
+          "id": "agent_2",
+          "initial_x": 0,
+          "initial_y": 2,
+          "initial_energy": 10,
+          "target_x": 5,
+          "target_y": 2
+        }
+      ],
+      "pre_positioned": [
+        {
+          "id": "wall_s1",
+          "x": 4,
+          "y": 0,
+          "status": "exhausted"
+        },
+        {
+          "id": "wall_s2",
+          "x": 4,
+          "y": 1,
+          "status": "exhausted"
+        },
+        {
+          "id": "wall_s3",
+          "x": 4,
+          "y": 2,
+          "status": "exhausted"
+        },
+        {
+          "id": "wall_s4",
+          "x": 4,
+          "y": 3,
+          "status": "exhausted"
+        }
+      ],
+      "resources": [],
+      "max_energy": 10,
+      "collision_rule": "priority_rotation",
+      "resource_allocation_rule": "fair_balanced",
+      "enable_coordination": true
+    }
+  ]
+}
