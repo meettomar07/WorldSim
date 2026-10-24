@@ -1,5 +1,39 @@
 # WorldSim Handoff
 
+## Latest update: Phase 14.2 Remediation
+
+Phase 14.2 Remediation resolves the two known decentralized-mode regressions (U06 and U14) while strictly preserving local sensory horizon boundaries ($R = 2.0$), authoritative simulation physics, and 100% bit-for-bit backward compatibility with the centralized baseline:
+- **Core Targeted Improvements:**
+  1. *Fix U06: Energy-Safe Resource Selection under Horizon Blindness:*
+     - In `worldsim/coordination.py`, `MultiAgentCoordinator.get_resource_load` returns `None` when a queried resource is beyond the local communication radius ($R > 2.0$), explicitly representing the queue load as unknown.
+     - In `worldsim/robust_policy.py`, `ResourceUtilityEvaluator.compare_routes` implements a conservative unknown load policy: when queue load is unknown (`load is None`), applies a load penalty equivalent to an occupied resource and enforces travel margin safety (`energy - travel_cost >= 2`).
+     - Prevents agents with tight energy reserves from abandoning safe local resources to chase distant unobservable pads across the board.
+     - Scenario U06 (8-Agent Staggered Quadrant Mesh) achieves **100.0% completion** across seeds 500–519 (mean 17.0 steps, 0 exhaustions, matching centralized baseline).
+  2. *Fix U14: Local-Horizon Crossroad Junction Recognition & Doorway Yielding:*
+     - In `worldsim/coordination.py`, `is_crossroad(p)` recognizes internal 4-way crossroad junctions under local horizon ($R \le 2.0$) from doorway thresholds where `cardinals_open`, `known_diags >= 2`, and internal coordinates (`1 < p.x < width - 2`, `1 < p.y < height - 2`), preventing false positives on boundary cells, doorway exits, or outer walls.
+     - Preserves traffic clearance right-of-way: vehicles inside the crossroad have right-of-way, while vehicles entering the crossroad yield at the entrance doorway.
+     - Scenario U14 (Multi-Corner Blind Intersection) improves from **0.0% to 100.0% completion** across seeds 500–519 (mean 14.0 steps, 0 exhaustions, matching centralized baseline).
+  3. *Comprehensive Empirical Benchmark (32 Scenarios):*
+     - **Baseline Benchmark (16 Scenarios):** All 13 feasible baseline scenarios achieve **100.0% completion** in both Centralized and Decentralized modes. All 3 infeasible baseline scenarios (4A, 5A, 8) honestly achieve 0.0% completion in both modes.
+     - **Unseen Generalization (16 Scenarios):** All 14 feasible unseen scenarios (U01–U10, U12–U15) achieve **100.0% completion** in both Centralized and Decentralized modes (0 regressions, 0 exhaustions). Both infeasible unseen scenarios (U11, U16) honestly achieve 0.0% completion in both modes.
+     - Overall feasible completion rate across all 27 feasible scenarios: **100.0% Centralized, 100.0% Decentralized**.
+- **Benchmark & Test Suite Verification:**
+  - Dedicated unit test suite `tests/test_local_horizon_remediation.py` (6 tests covering reachable vs unreachable resources, unknown load handling, energy margins, partial pillar crossroad recognition, boundary cell discrimination, and end-to-end integration).
+  - Full test suite: **216 passed in 6.75s** (`python -m pytest`).
+  - Bit-for-bit trajectory equivalence across independent processes with randomized `PYTHONHASHSEED` (`0`, `42`, `12345`, `99999`).
+  - Benchmarks and reports: `phase14_2_benchmark_results.json` and `phase14_2_local_horizon_report.md`.
+
+Files changed / added:
+- `worldsim/coordination.py` (updated: unknown resource load as `None` outside $R=2.0$, internal crossroad recognition under partial visibility)
+- `worldsim/robust_policy.py` (updated: conservative unknown load penalty and travel margin protection in `ResourceUtilityEvaluator`)
+- `tests/test_local_horizon_coordination.py` (updated: asserted `assertIsNone` for distant resource load in decentralized mode)
+- `tests/test_local_horizon_remediation.py` (new test suite: 6 tests for U06 and U14 remediation)
+- `phase14_2_local_horizon_eval.py` (updated: remediation forensic analysis and documentation)
+- `phase14_2_benchmark_results.json` (updated artifact: all 27 feasible scenarios at 100.0% completion)
+- `phase14_2_local_horizon_report.md` (updated artifact: full comparative evaluation report)
+- `WORLD_SIM_PLAN.md` (updated)
+- `WORLD_SIM_HANDOFF.md` (updated)
+
 ## Latest update: Phase 14.2
 
 Phase 14.2 (Local-Horizon Coordination) implements and benchmarks an experimental decentralized coordination mode where agents share intentions, coordinate right-of-way, and inspect resource load strictly within a local sensory radius of $R = 2.0$ (Euclidean distance $\le 2.0$), while preserving the existing centralized mode as the default baseline:

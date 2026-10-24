@@ -657,9 +657,36 @@ class MultiAgentCoordinator:
         has_conflict = False
 
         def is_crossroad(p: Position) -> bool:
-            diags = (Position(p.x - 1, p.y - 1), Position(p.x + 1, p.y - 1), Position(p.x - 1, p.y + 1), Position(p.x + 1, p.y + 1))
-            cardinals = (Position(p.x, p.y - 1), Position(p.x, p.y + 1), Position(p.x - 1, p.y), Position(p.x + 1, p.y))
-            return all(d in all_obs for d in diags) and all(c not in all_obs for c in cardinals)
+            diags = (
+                Position(p.x - 1, p.y - 1),
+                Position(p.x + 1, p.y - 1),
+                Position(p.x - 1, p.y + 1),
+                Position(p.x + 1, p.y + 1),
+            )
+            cardinals = (
+                Position(p.x, p.y - 1),
+                Position(p.x, p.y + 1),
+                Position(p.x - 1, p.y),
+                Position(p.x + 1, p.y),
+            )
+            if self.coordination_mode == "centralized":
+                return all(d in all_obs for d in diags) and all(c not in all_obs for c in cardinals)
+            cardinals_open = all(
+                c not in all_obs and (self.world_width is None or 0 <= c.x < self.world_width) and (self.world_height is None or 0 <= c.y < self.world_height)
+                for c in cardinals
+            )
+            if not cardinals_open:
+                return False
+            known_diags = sum(1 for d in diags if d in all_obs)
+            if known_diags == 4:
+                return True
+            if known_diags >= 2:
+                if self.world_width is not None and (p.x <= 1 or p.x >= self.world_width - 2):
+                    return False
+                if self.world_height is not None and (p.y <= 1 or p.y >= self.world_height - 2):
+                    return False
+                return True
+            return False
 
         if is_swap_conflict and swap_partner is not None:
             if is_crossroad(pos):
@@ -894,8 +921,12 @@ class MultiAgentCoordinator:
         resource_pos: Position,
         exclude_agent: str | None = None,
         querying_agent_pos: Position | None = None,
-    ) -> int:
-        """Return number of agents currently committed to or targeting this resource."""
+    ) -> int | None:
+        """Return number of agents currently committed to or targeting this resource.
+
+        In decentralized mode, returns None if the resource is outside the querying agent's
+        local communication horizon, indicating that the queue load is unknown.
+        """
         if not self.enabled:
             return 0
         if self.coordination_mode == "centralized":
@@ -904,7 +935,10 @@ class MultiAgentCoordinator:
                 if aid != exclude_agent and pos == resource_pos
             )
         if querying_agent_pos is None:
-            return 0
+            return None
+        # In decentralized mode: if resource itself is beyond communication range, load is unknown
+        if not self.is_in_range(querying_agent_pos, resource_pos):
+            return None
         load = 0
         for aid, pos in self.resource_commitments.items():
             if aid == exclude_agent or pos != resource_pos:

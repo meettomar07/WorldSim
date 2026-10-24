@@ -410,6 +410,14 @@ class ResourceUtilityEvaluator:
                     exclude_agent=aid,
                     querying_agent_pos=pos,
                 )
+                travel_margin = energy - u.energy_to_reach
+                if load is None:
+                    # Resource queue is unknown outside local communication horizon.
+                    # Conservative policy: assume at least 1 queued agent and penalize insufficient travel margin.
+                    penalty = 30.0
+                    if travel_margin < 2:
+                        penalty += 60.0
+                    return u.utility_score - penalty
                 return u.utility_score - (load * 30.0)
             best_util = max(utilities, key=util_rank) if utilities else None
         else:

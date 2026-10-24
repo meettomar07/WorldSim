@@ -374,8 +374,8 @@ class TestLocalHorizonCoordination(unittest.TestCase):
         load_decent = coord_decent.get_resource_load(r_far, querying_agent_pos=pos_obs)
         load_cent = coord_cent.get_resource_load(r_far, querying_agent_pos=pos_obs)
 
-        # Decentralized mode cannot see the distant commitment
-        self.assertEqual(load_decent, 0)
+        # Decentralized mode cannot see the distant commitment: queue load is unknown (None)
+        self.assertIsNone(load_decent)
         # Centralized mode sees the distant commitment
         self.assertEqual(load_cent, 1)
 
