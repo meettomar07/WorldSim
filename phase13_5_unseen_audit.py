@@ -289,6 +289,7 @@ def run_scenario_audit_batch(
     pre_positioned: Sequence[PrePositionedEntity],
     seeds: Sequence[int],
     max_steps: int = 50,
+    coordination_mode: str = "centralized",
 ) -> tuple[ScenarioSummary, list[EpisodeRecord]]:
     """Execute all trials for an unseen scenario specification."""
     # Build MultiAgentWorldConfig
@@ -332,6 +333,7 @@ def run_scenario_audit_batch(
         enable_coordination=spec.enable_coordination,
         cooperative_sharing=True,
         goal_criterion="individual",
+        coordination_mode=coordination_mode,
     )
 
     active_agent_ids = tuple(a["id"] for a in spec.active_agents)

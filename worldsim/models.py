@@ -1,6 +1,7 @@
 """Immutable domain objects, deliberately free of rendering concerns."""
 
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +53,7 @@ class Observation:
     energy: int = 10
     observed_resources: tuple[Resource, ...] = ()
     target: Position | None = None
+    observed_dynamic_obstacles: tuple[Any, ...] = ()
 
 
 

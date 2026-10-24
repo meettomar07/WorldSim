@@ -44,6 +44,30 @@ def jains_fairness_index(values: Sequence[float]) -> float:
 
 
 # ==============================================================================
+# Helper: Deterministic Agent Priority Hashing
+# ==============================================================================
+
+def agent_val(aid: str) -> int:
+    """Deterministic integer value for an agent ID for priority ordering.
+
+    Handles numbered IDs (e.g. 'agent_1'), cardinal directions (e.g. 'agent_n', 's'),
+    and arbitrary strings via a deterministic polynomial hash (avoiding Python's
+    randomized process-level hash seed).
+    """
+    digits = "".join(ch for ch in aid if ch.isdigit())
+    if digits:
+        return int(digits)
+    cardinals = {"n": 0, "s": 1, "w": 2, "e": 3, "nw": 0, "ne": 1, "sw": 2, "se": 3}
+    for k, v in cardinals.items():
+        if aid == k or aid.endswith(f"_{k}"):
+            return v
+    h = 0
+    for c in aid:
+        h = (h * 31 + ord(c)) & 0xFFFFFF
+    return h
+
+
+# ==============================================================================
 # Stage 2: Fair, Energy-Aware Resource Allocation
 # ==============================================================================
 
@@ -127,8 +151,8 @@ class ResourceArbitrator:
                 e = agent_energies.get(aid, 0)
                 max_e = agent_max_energies.get(aid, 10)
                 deficit = max_e - e
-                # higher deficit first -> sort by -deficit, then e, then rotated id
-                rot_tie = (hash(aid) + tick) % 1000
+                # higher deficit first -> sort by -deficit, then e, then rotated id deterministically
+                rot_tie = (agent_val(aid) + tick) % 1000
                 return (-deficit, e, rot_tie)
 
             winner = min(claimants, key=urgency_key)
@@ -187,12 +211,15 @@ class DeadlockEvent:
     location: Position
     resolved: bool = False
     recovery_action_applied: str | None = None
+    classification: str = "structural_deadlock"  # "structural_deadlock" or "cooperative_waiting"
+    waiting_reason: str | None = None  # e.g. "resource_queue", "bottleneck_yielding", "circular_wait"
 
 
 class DeadlockDetector:
     """Observable simulation deadlock detector with bounded recovery monitoring.
 
-    Tracks spatial progress, repeated collisions, and position cycling across agents.
+    Tracks spatial progress, repeated collisions, and position cycling across agents,
+    distinguishing between benign cooperative waiting and true structural deadlocks.
     """
 
     def __init__(self, persistence_threshold: int = 2) -> None:
@@ -209,6 +236,49 @@ class DeadlockDetector:
         self.swap_history: deque[tuple[str, str, Position, Position]] = deque(maxlen=10)
         self.vertex_history: dict[Position, deque[tuple[int, tuple[str, ...]]]] = {}
 
+    @property
+    def cooperative_waiting_events(self) -> list[DeadlockEvent]:
+        """Events classified as benign cooperative waiting (queueing or yielding)."""
+        return [ev for ev in self.detected_events if ev.classification == "cooperative_waiting"]
+
+    @property
+    def structural_deadlock_events(self) -> list[DeadlockEvent]:
+        """Events classified as true structural deadlocks (circular wait or unyielding lock)."""
+        return [ev for ev in self.detected_events if ev.classification == "structural_deadlock"]
+
+    @property
+    def cooperative_waiting_count(self) -> int:
+        return len(self.cooperative_waiting_events)
+
+    @property
+    def structural_deadlock_count(self) -> int:
+        return len(self.structural_deadlock_events)
+
+    @property
+    def unresolved_structural_deadlocks(self) -> int:
+        """Count of active unresolved events that are true structural deadlocks."""
+        return sum(
+            1 for idx in self._unresolved_event_indices
+            if idx < len(self.detected_events) and self.detected_events[idx].classification == "structural_deadlock"
+        )
+
+    @property
+    def unresolved_cooperative_waits(self) -> int:
+        """Count of active unresolved events that are cooperative waits."""
+        return sum(
+            1 for idx in self._unresolved_event_indices
+            if idx < len(self.detected_events) and self.detected_events[idx].classification == "cooperative_waiting"
+        )
+
+    @property
+    def waiting_reasons_tally(self) -> dict[str, int]:
+        """Distribution of waiting reasons across all detected events."""
+        tally: dict[str, int] = {}
+        for ev in self.detected_events:
+            reason = ev.waiting_reason or "unknown"
+            tally[reason] = tally.get(reason, 0) + 1
+        return tally
+
     def update_tick(
         self,
         tick: int,
@@ -216,6 +286,8 @@ class DeadlockDetector:
         intents: dict[str, tuple[Action, Position]],
         collisions: dict[str, str | None],
         moved_flags: dict[str, bool],
+        coordinator: Any | None = None,
+        resources: Sequence[Position] | Sequence[Resource] | None = None,
     ) -> list[DeadlockEvent]:
         """Analyze current tick outcomes and detect new or ongoing deadlocks."""
         # 0. Check if any previously unresolved deadlocks have now moved and recovered
@@ -227,6 +299,48 @@ class DeadlockDetector:
                 resolved_indices.add(idx)
         self._unresolved_event_indices -= resolved_indices
         self.unresolved_deadlocks = len(self._unresolved_event_indices)
+
+        resource_set: set[Position] = set()
+        if resources is not None:
+            for r in resources:
+                if isinstance(r, Position):
+                    resource_set.add(r)
+                elif hasattr(r, "position"):
+                    resource_set.add(r.position)
+        if coordinator is not None:
+            if hasattr(coordinator, "resource_commitments"):
+                resource_set.update(coordinator.resource_commitments.values())
+            if hasattr(coordinator, "resource_reservations"):
+                resource_set.update(coordinator.resource_reservations.keys())
+
+        def classify_occupied(aid: str, dest: Position) -> tuple[str, str]:
+            if dest in resource_set or any(abs(dest.x - r.x) + abs(dest.y - r.y) <= 1 for r in resource_set):
+                return ("cooperative_waiting", "resource_queue")
+            if coordinator is not None and coordinator.resource_commitments.get(aid) in resource_set:
+                return ("cooperative_waiting", "resource_queue")
+            occupant = next((oid for oid, opos in agent_positions.items() if opos == dest and oid != aid), None)
+            if occupant is not None:
+                occ_intent_dest = intents.get(occupant, (None, None))[1]
+                if moved_flags.get(occupant, False) or (occ_intent_dest is not None and occ_intent_dest != dest):
+                    return ("cooperative_waiting", "bottleneck_yielding")
+                if coordinator is not None and coordinator.agent_intentions.get(occupant) not in (None, dest):
+                    return ("cooperative_waiting", "bottleneck_yielding")
+                if coordinator is not None:
+                    return ("cooperative_waiting", "bottleneck_yielding")
+                return ("structural_deadlock", "unresolvable_block")
+            return ("structural_deadlock", "unresolvable_block")
+
+        def classify_swap(a1: str, a2: str, loc: Position) -> tuple[str, str]:
+            if coordinator is not None:
+                return ("cooperative_waiting", "swap_yielding")
+            return ("structural_deadlock", "reciprocal_swap_lock")
+
+        def classify_vertex(aid: str, dest: Position) -> tuple[str, str]:
+            if dest in resource_set or any(abs(dest.x - r.x) + abs(dest.y - r.y) <= 1 for r in resource_set):
+                return ("cooperative_waiting", "resource_contention")
+            if coordinator is not None:
+                return ("cooperative_waiting", "doorway_contention")
+            return ("structural_deadlock", "vertex_contention_lock")
 
         new_events: list[DeadlockEvent] = []
 
@@ -243,11 +357,14 @@ class DeadlockDetector:
             if count >= self.persistence_threshold and collisions.get(aid) == "occupied":
                 pos = agent_positions[aid]
                 dest = intents[aid][1]
+                classification, reason = classify_occupied(aid, dest)
                 event = DeadlockEvent(
                     tick=tick,
                     deadlock_type="occupied_blocking",
                     affected_agents=(aid,),
                     location=dest,
+                    classification=classification,
+                    waiting_reason=reason,
                 )
                 new_events.append(event)
                 self.detected_events.append(event)
@@ -264,11 +381,14 @@ class DeadlockDetector:
                         # Recorded swap
                         recent_swaps = [s for s in self.swap_history if (s[0] == a1 and s[1] == a2) or (s[0] == a2 and s[1] == a1)]
                         if len(recent_swaps) >= 1:
+                            classification, reason = classify_swap(a1, a2, p1)
                             event = DeadlockEvent(
                                 tick=tick,
                                 deadlock_type="repeated_swap",
                                 affected_agents=(a1, a2),
                                 location=p1,
+                                classification=classification,
+                                waiting_reason=reason,
                             )
                             new_events.append(event)
                             self.detected_events.append(event)
@@ -282,11 +402,14 @@ class DeadlockDetector:
                 v_queue.append((tick, (aid,)))
                 recent_v = [v for v in v_queue if tick - v[0] <= 2]
                 if len(recent_v) >= self.persistence_threshold:
+                    classification, reason = classify_vertex(aid, dest)
                     event = DeadlockEvent(
                         tick=tick,
                         deadlock_type="vertex_deadlock",
                         affected_agents=(aid,),
                         location=dest,
+                        classification=classification,
+                        waiting_reason=reason,
                     )
                     new_events.append(event)
                     self.detected_events.append(event)
@@ -305,30 +428,6 @@ class DeadlockDetector:
             self.successful_recoveries += 1
         else:
             self.unresolved_deadlocks += 1
-
-
-# ==============================================================================
-# Helper: Deterministic Agent Priority Hashing
-# ==============================================================================
-
-def agent_val(aid: str) -> int:
-    """Deterministic integer value for an agent ID for priority ordering.
-
-    Handles numbered IDs (e.g. 'agent_1'), cardinal directions (e.g. 'agent_n', 's'),
-    and arbitrary strings via a deterministic polynomial hash (avoiding Python's
-    randomized process-level hash seed).
-    """
-    digits = "".join(ch for ch in aid if ch.isdigit())
-    if digits:
-        return int(digits)
-    cardinals = {"n": 0, "s": 1, "w": 2, "e": 3, "nw": 0, "ne": 1, "sw": 2, "se": 3}
-    for k, v in cardinals.items():
-        if aid == k or aid.endswith(f"_{k}"):
-            return v
-    h = 0
-    for c in aid:
-        h = (h * 31 + ord(c)) & 0xFFFFFF
-    return h
 
 
 # ==============================================================================
@@ -362,12 +461,18 @@ class MultiAgentCoordinator:
         enabled: bool = True,
         world_width: int | None = None,
         world_height: int | None = None,
+        coordination_mode: str = "centralized",
+        communication_radius: float = 2.0,
     ) -> None:
         self.enabled = enabled
         self.world_width = world_width
         self.world_height = world_height
+        self.coordination_mode = coordination_mode
+        self.communication_radius = communication_radius
         self.agent_intentions: dict[str, Position] = {}
         self.previous_intentions: dict[str, Position] = {}
+        self.agent_positions: dict[str, Position] = {}
+        self.previous_positions: dict[str, Position] = {}
         self.resource_reservations: dict[Position, str] = {}
         self.resource_commitments: dict[str, Position] = {}
         self.congested_cells: set[Position] = set()
@@ -377,6 +482,8 @@ class MultiAgentCoordinator:
         """Reset coordinator state between episodes or explicit resets."""
         self.agent_intentions.clear()
         self.previous_intentions.clear()
+        self.agent_positions.clear()
+        self.previous_positions.clear()
         self.resource_reservations.clear()
         self.resource_commitments.clear()
         self.congested_cells.clear()
@@ -385,19 +492,69 @@ class MultiAgentCoordinator:
     def reset_tick(self) -> None:
         """Clear per-tick intentions while preserving persistent resource commitments."""
         self.previous_intentions = dict(self.agent_intentions)
+        self.previous_positions = dict(self.agent_positions)
         self.agent_intentions.clear()
 
-    def register_intent(self, agent_id: str, destination: Position, targeted_resource: Position | None = None) -> None:
+    def register_intent(
+        self,
+        agent_id: str,
+        destination: Position,
+        targeted_resource: Position | None = None,
+        current_position: Position | None = None,
+    ) -> None:
         """Register an agent's intended movement and resource destination for the tick."""
         if not self.enabled:
             return
         self.agent_intentions[agent_id] = destination
+        if current_position is not None:
+            self.agent_positions[agent_id] = current_position
         if targeted_resource is not None:
             self.resource_commitments[agent_id] = targeted_resource
             if targeted_resource not in self.resource_reservations:
                 self.resource_reservations[targeted_resource] = agent_id
         else:
             self.clear_commitment(agent_id)
+
+    def is_in_range(self, p1: Position, p2: Position) -> bool:
+        """Check if Euclidean distance between p1 and p2 is <= communication_radius."""
+        return (p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2 <= (self.communication_radius ** 2 + 1e-9)
+
+    def get_visible_peers(
+        self,
+        agent_id: str,
+        pos: Position,
+        current_positions: dict[str, Position] | None = None,
+    ) -> set[str]:
+        """Return the set of peer agent IDs whose intentions are visible to agent_id at pos."""
+        if self.coordination_mode == "centralized":
+            peers = set(self.agent_intentions.keys())
+            if hasattr(self, "previous_intentions"):
+                peers.update(self.previous_intentions.keys())
+            if current_positions:
+                peers.update(current_positions.keys())
+            peers.discard(agent_id)
+            return peers
+
+        visible: set[str] = set()
+        if current_positions:
+            for oid, opos in current_positions.items():
+                if oid != agent_id and self.is_in_range(pos, opos):
+                    visible.add(oid)
+
+        candidates = set(self.agent_positions.keys())
+        if hasattr(self, "previous_positions"):
+            candidates.update(self.previous_positions.keys())
+
+        for oid in candidates:
+            if oid == agent_id or oid in visible:
+                continue
+            opos = self.agent_positions.get(oid)
+            if opos is None and hasattr(self, "previous_positions"):
+                opos = self.previous_positions.get(oid)
+            if opos is not None and self.is_in_range(pos, opos):
+                visible.add(oid)
+
+        return visible
 
     def clear_commitment(self, agent_id: str) -> None:
         """Clear persistent resource commitment when agent arrives, completes, or exhausts."""
@@ -424,6 +581,7 @@ class MultiAgentCoordinator:
         energy: int | None = None,
         completed_positions: Sequence[Position] | set[Position] | None = None,
         obstacle_positions: Sequence[Position] | set[Position] | None = None,
+        dynamic_obstacles: Sequence[Any] | None = None,
     ) -> Action | None:
         """Suggest an alternative action if the preferred action would cause a conflict."""
         if not self.enabled or not candidate_actions:
@@ -438,14 +596,28 @@ class MultiAgentCoordinator:
         if pref_dest == pos:
             return None
 
+        self.agent_positions[agent_id] = pos
+
         comp_set = set(completed_positions) if completed_positions is not None else set()
         obs_set = set(obstacle_positions) if obstacle_positions is not None else set()
 
-        if not hasattr(self, "known_obstacles"):
-            self.known_obstacles = set()
-        if obs_set:
-            self.known_obstacles.update(obs_set)
-        all_obs = self.known_obstacles.union(obs_set)
+        if self.coordination_mode == "centralized":
+            if not hasattr(self, "known_obstacles"):
+                self.known_obstacles = set()
+            if obs_set:
+                self.known_obstacles.update(obs_set)
+            all_obs = self.known_obstacles.union(obs_set)
+        else:
+            # Decentralized mode: strictly use agent's own local obstacle memory
+            all_obs = obs_set
+
+        visible_peers = self.get_visible_peers(agent_id, pos, current_positions)
+        visible_intentions = {
+            oid: od for oid, od in self.agent_intentions.items() if oid in visible_peers
+        }
+        visible_prev_intentions = {
+            oid: od for oid, od in getattr(self, "previous_intentions", {}).items() if oid in visible_peers
+        }
 
         # Check for swap conflict with currently occupied cell
         is_swap_conflict = False
@@ -453,15 +625,27 @@ class MultiAgentCoordinator:
         if current_positions:
             for oid, opos in current_positions.items():
                 if oid != agent_id and opos == pref_dest and opos not in comp_set:
-                    oint = self.agent_intentions.get(oid)
-                    prev_oint = getattr(self, "previous_intentions", {}).get(oid)
-                    if oint == pos or prev_oint == pos:
-                        is_swap_conflict = True
-                        swap_partner = oid
-                        break
+                    if self.coordination_mode == "centralized" or oid in visible_peers:
+                        oint = visible_intentions.get(oid)
+                        prev_oint = visible_prev_intentions.get(oid)
+                        if oint == pos or prev_oint == pos:
+                            is_swap_conflict = True
+                            swap_partner = oid
+                            break
 
         # Never redirect away from a resource pad or target waypoint unless in swap conflict
-        if (pref_dest in self.resource_commitments.values() or pref_dest in self.resource_reservations) and not is_swap_conflict:
+        if self.coordination_mode == "centralized":
+            relevant_commitments = set(self.resource_commitments.values())
+            relevant_reservations = set(self.resource_reservations.keys())
+        else:
+            relevant_commitments = {
+                res for aid, res in self.resource_commitments.items() if aid in visible_peers
+            }
+            relevant_reservations = {
+                res for res, aid in self.resource_reservations.items() if aid in visible_peers
+            }
+
+        if (pref_dest in relevant_commitments or pref_dest in relevant_reservations) and not is_swap_conflict:
             return None
         if target is not None and pref_dest == target and not is_swap_conflict:
             return None
@@ -473,10 +657,55 @@ class MultiAgentCoordinator:
         # Check if the preferred action causes a conflict
         has_conflict = False
 
+        dyn_current_cells: set[Position] = set()
+        dyn_predicted_cells: set[Position] = set()
+        if dynamic_obstacles:
+            for obs in dynamic_obstacles:
+                obs_pos = getattr(obs, "position", None)
+                if obs_pos is None:
+                    continue
+                if self.coordination_mode == "centralized" or self.is_in_range(pos, obs_pos):
+                    dyn_current_cells.add(obs_pos)
+                    vel = getattr(obs, "velocity", (0, 0))
+                    nxt = Position(obs_pos.x + vel[0], obs_pos.y + vel[1])
+                    dyn_predicted_cells.add(nxt)
+                    all_obs.add(obs_pos)
+                    all_obs.add(nxt)
+
+        if pref_dest in dyn_current_cells or pref_dest in dyn_predicted_cells:
+            has_conflict = True
+
         def is_crossroad(p: Position) -> bool:
-            diags = (Position(p.x - 1, p.y - 1), Position(p.x + 1, p.y - 1), Position(p.x - 1, p.y + 1), Position(p.x + 1, p.y + 1))
-            cardinals = (Position(p.x, p.y - 1), Position(p.x, p.y + 1), Position(p.x - 1, p.y), Position(p.x + 1, p.y))
-            return all(d in all_obs for d in diags) and all(c not in all_obs for c in cardinals)
+            diags = (
+                Position(p.x - 1, p.y - 1),
+                Position(p.x + 1, p.y - 1),
+                Position(p.x - 1, p.y + 1),
+                Position(p.x + 1, p.y + 1),
+            )
+            cardinals = (
+                Position(p.x, p.y - 1),
+                Position(p.x, p.y + 1),
+                Position(p.x - 1, p.y),
+                Position(p.x + 1, p.y),
+            )
+            if self.coordination_mode == "centralized":
+                return all(d in all_obs for d in diags) and all(c not in all_obs for c in cardinals)
+            cardinals_open = all(
+                c not in all_obs and (self.world_width is None or 0 <= c.x < self.world_width) and (self.world_height is None or 0 <= c.y < self.world_height)
+                for c in cardinals
+            )
+            if not cardinals_open:
+                return False
+            known_diags = sum(1 for d in diags if d in all_obs)
+            if known_diags == 4:
+                return True
+            if known_diags >= 2:
+                if self.world_width is not None and (p.x <= 1 or p.x >= self.world_width - 2):
+                    return False
+                if self.world_height is not None and (p.y <= 1 or p.y >= self.world_height - 2):
+                    return False
+                return True
+            return False
 
         if is_swap_conflict and swap_partner is not None:
             if is_crossroad(pos):
@@ -518,7 +747,7 @@ class MultiAgentCoordinator:
 
         # 1. Vertex conflict with registered intents
         if not has_conflict:
-            for oid, od in self.agent_intentions.items():
+            for oid, od in visible_intentions.items():
                 if oid != agent_id and od == pref_dest:
                     oprio = ((agent_val(oid) - 1) + tick) % rot_base
                     if oprio <= my_prio:
@@ -529,15 +758,16 @@ class MultiAgentCoordinator:
         if not has_conflict and current_positions:
             for oid, opos in current_positions.items():
                 if oid != agent_id and opos == pref_dest and opos not in comp_set:
-                    oint = self.agent_intentions.get(oid)
-                    if oint == pos:
-                        oprio = ((agent_val(oid) - 1) + tick) % rot_base
-                        if oprio <= my_prio:
+                    if self.coordination_mode == "centralized" or oid in visible_peers:
+                        oint = visible_intentions.get(oid)
+                        if oint == pos:
+                            oprio = ((agent_val(oid) - 1) + tick) % rot_base
+                            if oprio <= my_prio:
+                                has_conflict = True
+                                break
+                        elif oint == pref_dest:
                             has_conflict = True
                             break
-                    elif oint == pref_dest:
-                        has_conflict = True
-                        break
 
         if not has_conflict:
             return None
@@ -551,6 +781,8 @@ class MultiAgentCoordinator:
             if a == pref:
                 continue
             if a == Action.RECHARGE:
+                if pos in dyn_predicted_cells:
+                    continue  # Unsafe to wait if dynamic obstacle is moving directly into pos!
                 safe_actions.append(a)
                 continue
 
@@ -571,18 +803,19 @@ class MultiAgentCoordinator:
                 continue
             if d in all_obs:
                 continue
-            if any(oid != agent_id and od == d for oid, od in self.agent_intentions.items()):
+            if any(oid != agent_id and od == d for oid, od in visible_intentions.items()):
                 continue
 
             s_conf = False
             if current_positions:
                 for oid, opos in current_positions.items():
                     if oid != agent_id and opos == d and opos not in comp_set:
-                        oint = self.agent_intentions.get(oid)
-                        # Stationary / exhausted (oint is None) or staying / swapping
-                        if oint is None or oint == pos or oint == d:
-                            s_conf = True
-                            break
+                        if self.coordination_mode == "centralized" or oid in visible_peers:
+                            oint = visible_intentions.get(oid)
+                            # Stationary / exhausted (oint is None) or staying / swapping
+                            if oint is None or oint == pos or oint == d:
+                                s_conf = True
+                                break
             if s_conf:
                 continue
 
@@ -638,6 +871,7 @@ class MultiAgentCoordinator:
         current_positions: dict[str, Position] | None = None,
         completed_positions: Sequence[Position] | set[Position] | None = None,
         obstacle_positions: Sequence[Position] | set[Position] | None = None,
+        dynamic_obstacles: Sequence[Any] | None = None,
     ) -> Action | None:
         """Provide an actionable sidestep or yield behavior to resolve detected deadlocks."""
         if not self.enabled or not legal_actions:
@@ -655,6 +889,11 @@ class MultiAgentCoordinator:
 
         comp_set = set(completed_positions) if completed_positions is not None else set()
         obs_set = set(obstacle_positions) if obstacle_positions is not None else set()
+
+        visible_peers = self.get_visible_peers(agent_id, pos, current_positions)
+        visible_intentions = {
+            oid: od for oid, od in self.agent_intentions.items() if oid in visible_peers
+        }
 
         orthogonal_candidates: list[Action] = []
         if blocked_cell is not None:
@@ -679,16 +918,17 @@ class MultiAgentCoordinator:
                 continue
             if d in obs_set:
                 continue
-            if any(oid != agent_id and od == d for oid, od in self.agent_intentions.items()):
+            if any(oid != agent_id and od == d for oid, od in visible_intentions.items()):
                 continue
             if current_positions:
                 s_conf = False
                 for oid, opos in current_positions.items():
                     if oid != agent_id and opos == d and opos not in comp_set:
-                        oint = self.agent_intentions.get(oid)
-                        if oint is None or oint == pos or oint == d:
-                            s_conf = True
-                            break
+                        if self.coordination_mode == "centralized" or oid in visible_peers:
+                            oint = visible_intentions.get(oid)
+                            if oint is None or oint == pos or oint == d:
+                                s_conf = True
+                                break
                 if s_conf:
                     continue
             return cand
@@ -698,11 +938,36 @@ class MultiAgentCoordinator:
 
         return None
 
-    def get_resource_load(self, resource_pos: Position, exclude_agent: str | None = None) -> int:
-        """Return number of agents currently committed to or targeting this resource."""
+    def get_resource_load(
+        self,
+        resource_pos: Position,
+        exclude_agent: str | None = None,
+        querying_agent_pos: Position | None = None,
+    ) -> int | None:
+        """Return number of agents currently committed to or targeting this resource.
+
+        In decentralized mode, returns None if the resource is outside the querying agent's
+        local communication horizon, indicating that the queue load is unknown.
+        """
         if not self.enabled:
             return 0
-        load = sum(1 for aid, pos in self.resource_commitments.items() if aid != exclude_agent and pos == resource_pos)
+        if self.coordination_mode == "centralized":
+            return sum(
+                1 for aid, pos in self.resource_commitments.items()
+                if aid != exclude_agent and pos == resource_pos
+            )
+        if querying_agent_pos is None:
+            return None
+        # In decentralized mode: if resource itself is beyond communication range, load is unknown
+        if not self.is_in_range(querying_agent_pos, resource_pos):
+            return None
+        load = 0
+        for aid, pos in self.resource_commitments.items():
+            if aid == exclude_agent or pos != resource_pos:
+                continue
+            aid_pos = self.agent_positions.get(aid)
+            if aid_pos is not None and self.is_in_range(querying_agent_pos, aid_pos):
+                load += 1
         return load
 
     def mark_congested(self, pos: Position) -> None:

@@ -17,6 +17,21 @@ from .experiment import ExperimentResult, run_experiment, run_policy_experiment
 from .learning import EpisodeResult, EvaluationResult, LearningConfig, LearningRunner, QLearner
 from .linear_learning import FeatureExtractor, LinearLearningConfig, LinearLearningRunner, LinearQLearner
 from .memory import ExperienceMemory, MemoryEntry
+from .dynamic_obstacles import (
+    DynamicObstacleConfig,
+    DynamicObstacleState,
+    predict_next_obstacle_state,
+    predict_obstacle_trajectory,
+)
+from .decentralized_learning import (
+    DecentralizedFeatureExtractor,
+    DecentralizedLearningConfig,
+    DecentralizedQLearner,
+    DecentralizedRewardEngine,
+    HybridCoordinationPolicy,
+    LearnedCoordinationPolicy,
+    train_decentralized_coordination,
+)
 from .models import Entity, Observation, Position, Resource, StepResult, WorldState
 from .multi_agent import (
     AgentConfig,
@@ -58,6 +73,7 @@ from .robust_policy import (
     RouteComparison,
 )
 from .viewer import MultiAgentWorldViewer, WorldViewer
+from .web_viewer import LiveViewerServer, SimulationSession, launch_web_viewer
 
 __all__ = [
     "Action",
@@ -69,6 +85,12 @@ __all__ = [
     "CycleDetector",
     "DeadlockDetector",
     "DeadlockEvent",
+    "DecentralizedFeatureExtractor",
+    "DecentralizedLearningConfig",
+    "DecentralizedQLearner",
+    "DecentralizedRewardEngine",
+    "DynamicObstacleConfig",
+    "DynamicObstacleState",
     "EnergyAwarePolicy",
     "EnergyIgnorantPolicy",
     "EnergyPlanResult",
@@ -83,11 +105,14 @@ __all__ = [
     "ExplorationController",
     "FairnessMonitor",
     "FeatureExtractor",
+    "HybridCoordinationPolicy",
     "LearningConfig",
     "LearningRunner",
+    "LearnedCoordinationPolicy",
     "LinearLearningConfig",
     "LinearLearningRunner",
     "LinearQLearner",
+    "LiveViewerServer",
     "MemoryEntry",
     "MultiAgentCoordinator",
     "MultiAgentExperimentMetrics",
@@ -113,6 +138,7 @@ __all__ = [
     "RobustResourcePolicy",
     "RouteComparison",
     "Simulation",
+    "SimulationSession",
     "StepResult",
     "WorldConfig",
     "WorldState",
@@ -120,6 +146,7 @@ __all__ = [
     "execute_energy_plan",
     "execute_plan",
     "jains_fairness_index",
+    "launch_web_viewer",
     "plan",
     "plan_energy",
     "run_all_multi_agent_experiments",
@@ -127,6 +154,7 @@ __all__ = [
     "run_experiment",
     "run_multi_agent_episode",
     "run_policy_experiment",
+    "train_decentralized_coordination",
 ]
 
 

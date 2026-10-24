@@ -26,6 +26,11 @@ from .coordination import (
     agent_val,
     jains_fairness_index,
 )
+from .dynamic_obstacles import (
+    DynamicObstacleConfig,
+    DynamicObstacleState,
+    predict_next_obstacle_state,
+)
 from .models import Position, Resource
 
 
@@ -72,6 +77,9 @@ class MultiAgentWorldConfig:
     congestion_safety_margin: int = 0
     goal_criterion: str = "individual"  # "individual", "shared_any", "shared_all", "shared_subset"
     required_goal_count: int = 1
+    coordination_mode: str = "centralized"  # "centralized" or "decentralized"
+    communication_radius: float = 2.0  # Communication/sensory radius for local horizon
+    dynamic_obstacles: tuple[DynamicObstacleConfig, ...] = ()
 
     def __post_init__(self) -> None:
         if self.width <= 0 or self.height <= 0:
@@ -82,6 +90,10 @@ class MultiAgentWorldConfig:
             raise ValueError("max_energy and movement_energy_cost must be positive.")
         if self.sensory_radius <= 0:
             raise ValueError("sensory_radius must be positive.")
+        if self.communication_radius <= 0:
+            raise ValueError("communication_radius must be positive.")
+        if self.coordination_mode not in {"centralized", "decentralized"}:
+            raise ValueError("coordination_mode must be 'centralized' or 'decentralized'.")
         if self.collision_rule not in {"bounce", "priority", "priority_rotation"}:
             raise ValueError("collision_rule must be 'bounce', 'priority', or 'priority_rotation'.")
         if self.resource_allocation_rule not in {
@@ -108,6 +120,25 @@ class MultiAgentWorldConfig:
             pos = (a.initial_x, a.initial_y)
             if pos in seen_positions:
                 raise ValueError(f"Agents cannot start on the same cell; duplicate position {pos}.")
+            seen_positions.add(pos)
+
+        # Validate dynamic obstacles
+        dyn_ids = [o.id for o in self.dynamic_obstacles]
+        if len(dyn_ids) != len(set(dyn_ids)):
+            raise ValueError(f"Dynamic obstacle IDs must be unique; got {dyn_ids}")
+        for did in dyn_ids:
+            if did in ids:
+                raise ValueError(f"Dynamic obstacle ID '{did}' conflicts with agent ID.")
+
+        res_positions = {(r.position.x, r.position.y) for r in self.resources}
+        for o in self.dynamic_obstacles:
+            pos = (o.initial_x, o.initial_y)
+            if not (0 <= o.initial_x < self.width and 0 <= o.initial_y < self.height):
+                raise ValueError(f"Dynamic obstacle {o.id} initial position {pos} is out of bounds.")
+            if pos in seen_positions:
+                raise ValueError(f"Dynamic obstacle {o.id} cannot start on an occupied agent cell: {pos}")
+            if pos in res_positions:
+                raise ValueError(f"Dynamic obstacle {o.id} cannot start on a resource pad: {pos}")
             seen_positions.add(pos)
 
 
@@ -138,6 +169,7 @@ class MultiAgentWorldState:
     agents: dict[str, AgentState]
     resources: tuple[Resource, ...] = ()
     shared_target: Position | None = None
+    dynamic_obstacles: dict[str, DynamicObstacleState] = field(default_factory=dict)
 
     def contains(self, position: Position) -> bool:
         return 0 <= position.x < self.width and 0 <= position.y < self.height
@@ -155,6 +187,7 @@ class MultiAgentObservation:
     target: Position | None = None
     observed_agents: tuple[AgentState, ...] = ()
     shared_discoveries: tuple[Resource, ...] = ()
+    observed_dynamic_obstacles: tuple[DynamicObstacleState, ...] = ()
 
 
 # ==============================================================================
@@ -198,6 +231,7 @@ class MultiAgentStepResult:
     overall_completed: bool
     deadlock_events: tuple[DeadlockEvent, ...] = ()
     blocked_agents: tuple[str, ...] = ()
+    dynamic_obstacle_collisions: int = 0
 
 
 # ==============================================================================
@@ -239,6 +273,17 @@ class MultiAgentSimulation:
                 status="active",
             )
 
+        # Initialize dynamic obstacles
+        dynamic_obs_dict: dict[str, DynamicObstacleState] = {}
+        for o in config.dynamic_obstacles:
+            dynamic_obs_dict[o.id] = DynamicObstacleState(
+                id=o.id,
+                position=Position(o.initial_x, o.initial_y),
+                velocity=o.velocity,
+                waypoint_index=0,
+                reverse_direction=False,
+            )
+
         self._state = MultiAgentWorldState(
             width=config.width,
             height=config.height,
@@ -246,10 +291,15 @@ class MultiAgentSimulation:
             agents=agents_dict,
             resources=config.resources,
             shared_target=config.shared_target,
+            dynamic_obstacles=dynamic_obs_dict,
         )
 
         self._paused = False
         self._shared_discoveries: set[Resource] = set()
+
+        # Dynamic obstacle tracking
+        self.dynamic_obstacle_history: list[dict[str, DynamicObstacleState]] = [dict(dynamic_obs_dict)]
+        self.cumulative_dynamic_obstacle_collisions = 0
 
         # Cumulative event counters
         self.cumulative_vertex_collisions = 0
@@ -269,6 +319,8 @@ class MultiAgentSimulation:
             enabled=config.enable_coordination,
             world_width=config.width,
             world_height=config.height,
+            coordination_mode=getattr(config, "coordination_mode", "centralized"),
+            communication_radius=getattr(config, "communication_radius", 2.0),
         )
         self.fairness_monitor = FairnessMonitor(agent_ids=[a.id for a in config.agents])
 
@@ -282,6 +334,11 @@ class MultiAgentSimulation:
 
     def compute_jains_fairness(self, metric_name: str = "goal_completion") -> float:
         return self.fairness_monitor.compute_jains_fairness(metric_name)
+
+    @property
+    def obstacle_history(self) -> list[dict[str, DynamicObstacleState]]:
+        """Return the chronological history of dynamic obstacle states."""
+        return self.dynamic_obstacle_history
 
     @property
     def state(self) -> MultiAgentWorldState:
@@ -323,6 +380,12 @@ class MultiAgentSimulation:
             if other_id != agent_id and (other.position.x - origin.x) ** 2 + (other.position.y - origin.y) ** 2 <= r_sq
         )
 
+        # Observed dynamic obstacles within sensory radius R
+        observed_dynamic = tuple(
+            obs for obs in self._state.dynamic_obstacles.values()
+            if (obs.position.x - origin.x) ** 2 + (obs.position.y - origin.y) ** 2 <= r_sq
+        )
+
         shared = tuple(sorted(self._shared_discoveries, key=lambda r: (r.position.x, r.position.y))) if self.config.cooperative_sharing else ()
 
         return MultiAgentObservation(
@@ -334,6 +397,7 @@ class MultiAgentSimulation:
             target=agent.target,
             observed_agents=observed_agents,
             shared_discoveries=shared,
+            observed_dynamic_obstacles=observed_dynamic,
         )
 
     def observe_all(self) -> dict[str, MultiAgentObservation]:
@@ -343,25 +407,145 @@ class MultiAgentSimulation:
     def _resolve_conflicts(
         self,
         intents: dict[str, tuple[Action, Position]],
-    ) -> tuple[dict[str, Position], dict[str, str | None], int, int, int]:
+    ) -> tuple[dict[str, Position], dict[str, str | None], dict[str, DynamicObstacleState], int, int, int, int]:
         """Deterministically resolve movement conflicts using iterative stability.
 
         Returns:
             final_destinations: agent_id -> final Position
             collision_types: agent_id -> collision type string or None
-            vertex_collisions, swap_collisions, occupied_collisions
+            next_obstacle_states: obstacle_id -> DynamicObstacleState
+            vertex_collisions, swap_collisions, occupied_collisions, dynamic_obstacle_collisions
         """
         initial_pos = {aid: self._state.agents[aid].position for aid in self._state.agents}
+        initial_obs_pos = {oid: self._state.dynamic_obstacles[oid].position for oid in self._state.dynamic_obstacles}
         tentative_dest = {aid: dest for aid, (_, dest) in intents.items()}
         collision_type: dict[str, str | None] = {aid: None for aid in self._state.agents}
+
+        # Predict proposed states for dynamic obstacles
+        obs_configs = {o.id: o for o in self.config.dynamic_obstacles}
+        static_blocked_for_obstacles = set(r.position for r in self._state.resources)
+        # Inactive or exhausted agents act as impassable walls
+        static_blocked_for_obstacles.update(
+            a.position for a in self._state.agents.values() if not a.active
+        )
+
+        tentative_obs_states: dict[str, DynamicObstacleState] = {}
+        for oid, obs_state in self._state.dynamic_obstacles.items():
+            tentative_obs_states[oid] = predict_next_obstacle_state(
+                obs_state,
+                obs_configs[oid],
+                self.config.width,
+                self.config.height,
+                static_blocked_for_obstacles,
+            )
 
         v_count = 0
         s_count = 0
         o_count = 0
+        dyn_count = 0
 
         changed = True
         while changed:
             changed = False
+
+            # Obstacle vs Obstacle conflicts
+            # 1. Two obstacles claiming the same destination cell
+            obs_claims: dict[Position, list[str]] = {}
+            for oid, state in tentative_obs_states.items():
+                obs_claims.setdefault(state.position, []).append(oid)
+            for cell, claimants in obs_claims.items():
+                if len(claimants) >= 2:
+                    for oid in claimants:
+                        if tentative_obs_states[oid].position != initial_obs_pos[oid]:
+                            cur_v = tentative_obs_states[oid].velocity
+                            tentative_obs_states[oid] = DynamicObstacleState(
+                                id=oid,
+                                position=initial_obs_pos[oid],
+                                velocity=(-cur_v[0], -cur_v[1]),
+                                waypoint_index=tentative_obs_states[oid].waypoint_index,
+                                reverse_direction=not tentative_obs_states[oid].reverse_direction,
+                            )
+                            changed = True
+
+            # 2. Two obstacles swap
+            for o1 in list(tentative_obs_states):
+                for o2 in list(tentative_obs_states):
+                    if o1 < o2:
+                        if (
+                            tentative_obs_states[o1].position == initial_obs_pos[o2]
+                            and tentative_obs_states[o2].position == initial_obs_pos[o1]
+                            and initial_obs_pos[o1] != initial_obs_pos[o2]
+                        ):
+                            cur_v1 = tentative_obs_states[o1].velocity
+                            cur_v2 = tentative_obs_states[o2].velocity
+                            tentative_obs_states[o1] = DynamicObstacleState(
+                                id=o1,
+                                position=initial_obs_pos[o1],
+                                velocity=(-cur_v1[0], -cur_v1[1]),
+                                waypoint_index=tentative_obs_states[o1].waypoint_index,
+                                reverse_direction=not tentative_obs_states[o1].reverse_direction,
+                            )
+                            tentative_obs_states[o2] = DynamicObstacleState(
+                                id=o2,
+                                position=initial_obs_pos[o2],
+                                velocity=(-cur_v2[0], -cur_v2[1]),
+                                waypoint_index=tentative_obs_states[o2].waypoint_index,
+                                reverse_direction=not tentative_obs_states[o2].reverse_direction,
+                            )
+                            changed = True
+
+            # Agent vs Dynamic Obstacle conflicts
+            for aid in list(tentative_dest):
+                a_dest = tentative_dest[aid]
+                for oid, obs_state in list(tentative_obs_states.items()):
+                    o_dest = obs_state.position
+                    o_init = initial_obs_pos[oid]
+                    a_init = initial_pos[aid]
+
+                    # 1. Swap: agent tries to enter obstacle's cell, obstacle tries to enter agent's cell
+                    if a_dest == o_init and o_dest == a_init and a_init != o_init:
+                        tentative_dest[aid] = a_init
+                        collision_type[aid] = "swap"
+                        cur_v = obs_state.velocity
+                        tentative_obs_states[oid] = DynamicObstacleState(
+                            id=oid,
+                            position=o_init,
+                            velocity=(-cur_v[0], -cur_v[1]),
+                            waypoint_index=obs_state.waypoint_index,
+                            reverse_direction=not obs_state.reverse_direction,
+                        )
+                        dyn_count += 1
+                        changed = True
+                        continue
+
+                    # 2. Vertex: agent and obstacle try to enter the same vacant cell
+                    if a_dest == o_dest and a_dest != a_init and a_dest != o_init:
+                        tentative_dest[aid] = a_init
+                        collision_type[aid] = "vertex"
+                        dyn_count += 1
+                        changed = True
+                        continue
+
+                    # 3. Obstacle tries to move into agent's cell while agent is stationary / waiting
+                    if o_dest == a_dest and a_dest == a_init:
+                        cur_v = obs_state.velocity
+                        tentative_obs_states[oid] = DynamicObstacleState(
+                            id=oid,
+                            position=o_init,
+                            velocity=(-cur_v[0], -cur_v[1]),
+                            waypoint_index=obs_state.waypoint_index,
+                            reverse_direction=not obs_state.reverse_direction,
+                        )
+                        changed = True
+                        continue
+
+                    # 4. Agent tries to move into stationary obstacle's cell
+                    if a_dest == o_init and o_dest == o_init and a_dest != a_init:
+                        tentative_dest[aid] = a_init
+                        collision_type[aid] = "occupied"
+                        dyn_count += 1
+                        changed = True
+                        continue
 
             # 1. Vertex Collisions: 2+ agents claiming the same destination cell C
             dest_claims: dict[Position, list[str]] = {}
@@ -449,7 +633,7 @@ class MultiAgentSimulation:
                             o_count += 1
                             changed = True
 
-        return tentative_dest, collision_type, v_count, s_count, o_count
+        return tentative_dest, collision_type, tentative_obs_states, v_count, s_count, o_count, dyn_count
 
     def step(self, actions: dict[str, Action]) -> MultiAgentStepResult:
         """Execute one simultaneous tick across all agents.
@@ -525,10 +709,11 @@ class MultiAgentSimulation:
                         intents[aid] = (act, dest)
 
         # Phase 3: Conflict resolution
-        final_dests, collisions, v_cols, s_cols, o_cols = self._resolve_conflicts(intents)
+        final_dests, collisions, next_obs_states, v_cols, s_cols, o_cols, dyn_cols = self._resolve_conflicts(intents)
         self.cumulative_vertex_collisions += v_cols
         self.cumulative_swap_collisions += s_cols
         self.cumulative_occupied_collisions += o_cols
+        self.cumulative_dynamic_obstacle_collisions += dyn_cols
 
         # Phase 4: Atomic movements and resource interactions
         # First, process movements and energy costs
@@ -672,7 +857,9 @@ class MultiAgentSimulation:
             agents=new_agents,
             resources=tuple(remaining_resources),
             shared_target=self._state.shared_target,
+            dynamic_obstacles=next_obs_states,
         )
+        self.dynamic_obstacle_history.append(dict(next_obs_states))
 
         # Phase 6: Cooperative discovery sharing
         if self.config.cooperative_sharing:
@@ -716,6 +903,8 @@ class MultiAgentSimulation:
             intents=intents_for_detector,
             collisions=collisions,
             moved_flags=moved_flags,
+            coordinator=self.coordinator,
+            resources=tuple(r.position for r in self._state.resources),
         )
 
         recharge_outcomes = {}
@@ -756,6 +945,7 @@ class MultiAgentSimulation:
             overall_completed=overall_completed,
             deadlock_events=tuple(deadlocks),
             blocked_agents=tuple(aid for aid, col in collisions.items() if col is not None),
+            dynamic_obstacle_collisions=dyn_cols,
         )
 
     def _check_overall_completion(self) -> bool:
