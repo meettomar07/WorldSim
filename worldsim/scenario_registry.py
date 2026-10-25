@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 
 from worldsim.fingerprint import compute_environment_fingerprint
 from worldsim.models import Position, Resource
@@ -191,12 +191,37 @@ def assert_not_held_out(scenario_id: str, context: str = "Training/Tuning") -> N
         )
 
 
+def assert_split(
+    scenario_id: str,
+    allowed_splits: Sequence[Split] | Split,
+    context: str = "Pipeline Execution",
+) -> None:
+    """Enforce that a scenario belongs strictly to the allowed split(s)."""
+    desc = get_scenario_descriptor(scenario_id)
+    if isinstance(allowed_splits, Split):
+        allowed = {allowed_splits}
+    else:
+        allowed = set(allowed_splits)
+
+    if desc.split not in allowed:
+        raise RuntimeError(
+            f"SPLIT ISOLATION VIOLATION! Scenario '{scenario_id}' belongs to {desc.split.name}, "
+            f"which is not permitted during {context} (allowed: {[s.name for s in allowed]})."
+        )
+
+
 def build_scenario_instance(
     scenario_id: str,
     env_seed: int = 42,
+    required_split: Split | None = None,
 ) -> tuple[MultiAgentWorldConfig, set[Position], str]:
     """Instantiate a scenario with an explicit environment seed, returning (config, walls, fingerprint)."""
     desc = get_scenario_descriptor(scenario_id)
+    if required_split is not None and desc.split != required_split:
+        raise RuntimeError(
+            f"SPLIT ISOLATION VIOLATION! Requested split {required_split.name} but scenario '{scenario_id}' "
+            f"is in {desc.split.name}."
+        )
 
     if desc.is_procedural:
         family_map = {
@@ -229,7 +254,7 @@ def build_scenario_instance(
                 max_energy=s.get("max_energy", 12),
                 enable_coordination=True,
             )
-            fp = compute_environment_fingerprint(cfg, walls=walls)
+            fp = compute_environment_fingerprint(cfg, walls=set())
             return cfg, set(), fp
         elif clean_id in unseen_dict:
             spec, prep = unseen_dict[clean_id]
@@ -255,5 +280,17 @@ def build_scenario_instance(
             )
             fp = compute_environment_fingerprint(cfg, walls=walls)
             return cfg, walls, fp
+        elif clean_id in ("ENV1", "ENV2", "ENV3"):
+            res_coords = {"ENV1": (2, 0), "ENV2": (0, 2), "ENV3": (2, 2)}[clean_id]
+            cfg = MultiAgentWorldConfig(
+                width=4,
+                height=4,
+                agents=(AgentConfig(id="agent_0", initial_x=0, initial_y=0, initial_energy=4, target=Position(3, 2)),),
+                resources=(Resource(Position(res_coords[0], res_coords[1]), recharge_amount=4, consumable=True),),
+                max_energy=6,
+                enable_coordination=False,
+            )
+            fp = compute_environment_fingerprint(cfg, walls=set())
+            return cfg, set(), fp
         else:
             raise KeyError(f"No factory implementation for static scenario: {scenario_id}")

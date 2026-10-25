@@ -9,6 +9,7 @@ from worldsim.scenario_generator import bfs_reachable_cells
 from worldsim.scenario_registry import (
     Split,
     assert_not_held_out,
+    assert_split,
     build_scenario_instance,
     get_scenario_descriptor,
     list_scenarios,
@@ -57,7 +58,7 @@ class TestScenarioRegistry(unittest.TestCase):
 
     def test_environmental_variation_across_seeds(self) -> None:
         """Verify that different seeds produce genuinely distinct environment fingerprints."""
-        for scen_id in ["TEST_H01", "TEST_H02", "TEST_H03", "TEST_H04"]:
+        for scen_id in ["TEST_H01", "TEST_H02", "TEST_H03", "TEST_H04", "TEST_H05", "TEST_H06"]:
             fingerprints = set()
             for seed in range(100, 115):
                 _, _, fp = build_scenario_instance(scen_id, env_seed=seed)
@@ -69,6 +70,32 @@ class TestScenarioRegistry(unittest.TestCase):
                 1,
                 f"Scenario {scen_id} produced no environmental variation across seeds",
             )
+
+    def test_assert_split_validation(self) -> None:
+        """Verify assert_split enforces specific split requirements."""
+        # TRAIN scenario passes when TRAIN split is allowed
+        assert_split("TRAIN_ENV1", allowed_splits=Split.TRAIN)
+        assert_split("TRAIN_ENV1", allowed_splits=[Split.TRAIN, Split.VAL])
+
+        # Violations raise RuntimeError
+        with self.assertRaises(RuntimeError) as ctx:
+            assert_split("TEST_H01", allowed_splits=Split.TRAIN, context="Pre-training")
+        self.assertIn("SPLIT ISOLATION VIOLATION", str(ctx.exception))
+
+        with self.assertRaises(RuntimeError) as ctx:
+            assert_split("VAL_U06", allowed_splits=Split.TEST, context="Held-out eval")
+        self.assertIn("SPLIT ISOLATION VIOLATION", str(ctx.exception))
+
+    def test_required_split_isolation(self) -> None:
+        """Verify build_scenario_instance rejects mismatching required splits."""
+        # Successful matching split
+        build_scenario_instance("TEST_H01", env_seed=42, required_split=Split.TEST)
+        build_scenario_instance("TRAIN_ENV1", env_seed=42, required_split=Split.TRAIN)
+
+        # Mismatch raises RuntimeError
+        with self.assertRaises(RuntimeError) as ctx:
+            build_scenario_instance("TEST_H01", env_seed=42, required_split=Split.TRAIN)
+        self.assertIn("SPLIT ISOLATION VIOLATION", str(ctx.exception))
 
     def test_maze_connectivity_invariant(self) -> None:
         """Verify procedural maze generator guarantees reachability between corners."""

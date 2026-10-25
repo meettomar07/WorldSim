@@ -6,6 +6,8 @@ import unittest
 
 from worldsim.statistics import (
     aggregate_raw_episodes,
+    cluster_bootstrap_interval,
+    compute_paired_comparison,
     summarize_continuous,
     wilson_score_interval,
 )
@@ -83,6 +85,7 @@ class TestStatisticalRigor(unittest.TestCase):
         summary = aggregate_raw_episodes("TEST_01", "Test Scenario", "heuristic", raw_records)
         self.assertEqual(summary.num_episodes, 2)
         self.assertEqual(summary.num_distinct_environments, 2)
+        self.assertEqual(summary.num_repeated_environments, 0)
         self.assertEqual(summary.completed_episodes, 1)
         self.assertEqual(summary.completion_rate, 0.5)
         self.assertEqual(summary.total_agent_slots, 4)
@@ -92,6 +95,65 @@ class TestStatisticalRigor(unittest.TestCase):
         self.assertEqual(summary.success_steps.count, 1)
         self.assertEqual(summary.success_steps.mean, 12.0)
         self.assertEqual(summary.all_episode_steps.mean, 31.0)
+
+    def test_cluster_bootstrap_insufficient_clusters(self) -> None:
+        """Verify cluster bootstrap refuses to output degenerate intervals for K < 5."""
+        episodes = [
+            {"environment_fingerprint": "c1", "completed": True},
+            {"environment_fingerprint": "c1", "completed": True},
+            {"environment_fingerprint": "c2", "completed": False},
+            {"environment_fingerprint": "c3", "completed": True},
+        ]
+        low, high, status = cluster_bootstrap_interval(episodes, min_clusters=5)
+        self.assertIsNone(low)
+        self.assertIsNone(high)
+        self.assertIn("INSUFFICIENT_CLUSTERS", status)
+
+    def test_cluster_bootstrap_valid_clusters(self) -> None:
+        """Verify cluster bootstrap computes non-degenerate bounds for K >= 5."""
+        episodes = [
+            {"environment_fingerprint": f"c{i}", "completed": (i % 2 == 0)}
+            for i in range(6)
+            for _ in range(2)
+        ]
+        low, high, status = cluster_bootstrap_interval(episodes, min_clusters=5, seed=42)
+        self.assertIsNotNone(low)
+        self.assertIsNotNone(high)
+        assert low is not None and high is not None
+        self.assertTrue(0.0 <= low <= high <= 1.0)
+        self.assertIn("Cluster Bootstrap", status)
+
+    def test_cluster_bootstrap_boundary_cases(self) -> None:
+        """Verify cluster bootstrap handles all-success and all-failure gracefully."""
+        all_succ = [{"environment_fingerprint": f"c{i}", "completed": True} for i in range(6)]
+        low_s, high_s, _ = cluster_bootstrap_interval(all_succ, min_clusters=5)
+        self.assertEqual(low_s, 1.0)
+        self.assertEqual(high_s, 1.0)
+
+        all_fail = [{"environment_fingerprint": f"c{i}", "completed": False} for i in range(6)]
+        low_f, high_f, _ = cluster_bootstrap_interval(all_fail, min_clusters=5)
+        self.assertEqual(low_f, 0.0)
+        self.assertEqual(high_f, 0.0)
+
+    def test_compute_paired_comparison(self) -> None:
+        """Verify compute_paired_comparison matches environments and calculates wins/ties."""
+        eps_a = [
+            {"scenario_id": "H01", "env_seed": 300, "completed": True, "steps": 10},
+            {"scenario_id": "H01", "env_seed": 301, "completed": False, "steps": 60},
+            {"scenario_id": "H01", "env_seed": 302, "completed": True, "steps": 12},
+        ]
+        eps_b = [
+            {"scenario_id": "H01", "env_seed": 300, "completed": False, "steps": 60},
+            {"scenario_id": "H01", "env_seed": 301, "completed": False, "steps": 60},
+            {"scenario_id": "H01", "env_seed": 302, "completed": True, "steps": 15},
+        ]
+
+        paired = compute_paired_comparison(eps_a, eps_b, "policy_a", "policy_b")
+        self.assertEqual(paired.num_matched_pairs, 3)
+        self.assertEqual(paired.wins_a, 1)  # Seed 300
+        self.assertEqual(paired.wins_b, 0)
+        self.assertEqual(paired.ties, 2)    # Seed 301 (both fail), 302 (both win)
+        self.assertEqual(paired.mean_step_diff, -3.0)
 
 
 if __name__ == "__main__":

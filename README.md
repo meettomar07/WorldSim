@@ -1,9 +1,9 @@
 # WorldSim
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg?style=flat-square)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/pytest-272%20passed-success.svg?style=flat-square)](file:///d:/SimWorld/tests)
-[![Architecture](https://img.shields.io/badge/Dependencies-Zero%20External-orange.svg?style=flat-square)](file:///d:/SimWorld/worldsim)
-[![Viewer](https://img.shields.io/badge/Live%20Viewer-HTML5%20Canvas%202D-green.svg?style=flat-square)](file:///d:/SimWorld/run_viewer.py)
+[![Tests](https://img.shields.io/badge/pytest-279%20passed-success.svg?style=flat-square)](tests/)
+[![Architecture](https://img.shields.io/badge/Dependencies-Zero%20External-orange.svg?style=flat-square)](worldsim/)
+[![Viewer](https://img.shields.io/badge/Live%20Viewer-HTML5%20Canvas%202D-green.svg?style=flat-square)](run_viewer.py)
 [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg?style=flat-square)](LICENSE)
 
 **WorldSim** is an open-source, deterministic multi-agent simulation, multi-agent pathfinding (MAPF), and decentralized reinforcement learning research platform. It investigates how autonomous agents coordinate, navigate tight bottlenecks, budget constrained energy, and avoid dynamic hazards under **strict partial observability ($R \le 2.0$)** with short-range communicative intent.
@@ -53,18 +53,18 @@ WorldSim implements a formal scenario split (`Split.TRAIN`, `Split.VAL`, `Split.
 | `TEST_H05` | **Three-Way T-Junction** | 3 agents converging simultaneously at an orthogonal 1-cell junction |
 | `TEST_H06` | **Critical Recharge Alcove Chokepoint** | Energy budget requires dead-end alcove recharge detour to reach target |
 
-Full empirical findings, confidence intervals, and raw records are in [`reports/HELD_OUT_BENCHMARK_REPORT.md`](file:///d:/SimWorld/reports/HELD_OUT_BENCHMARK_REPORT.md) and [`benchmarks/held_out_generalization_results.json`](file:///d:/SimWorld/benchmarks/held_out_generalization_results.json).
+Full empirical findings, confidence intervals, and raw records are in [`reports/HELD_OUT_BENCHMARK_REPORT.md`](reports/HELD_OUT_BENCHMARK_REPORT.md) and [`benchmarks/held_out_generalization_results.json`](benchmarks/held_out_generalization_results.json).
 
 ### Overall Held-Out Benchmark Results (10 Seeds per Scenario, 360 Episodes)
 
 | Policy | Information Boundary | Overall Completion (95% CI) | Agent Success | Exhaustions | Timeouts | Mean Runtime |
 |---|---|:---:|:---:|:---:|:---:|:---:|
-| **`hybrid_comm`** | Local Horizon ($R \le 2.0$) + Safety Guard | **98.3%** [91.1%, 99.7%] | **98.4%** | 1 | 0 | 7.2ms |
-| **`cbs`** (MAPF) | Offline Space-Time A* + Constraint Tree | **83.3%** [72.0%, 90.7%] | 89.5% | 10 | 0 | 37.1ms |
-| **`centralized`** | Omniscient Centralized Arbiter | **80.0%** [68.2%, 88.2%] | 86.8% | 0 | 12 | 15.4ms |
-| **`heuristic`** | Robust BFS Graph Search | **80.0%** [68.2%, 88.2%] | 86.8% | 0 | 12 | 15.3ms |
-| **`learned_comm`** | Decentralized Q-Learner + Intent Vectors | **70.0%** [57.5%, 80.1%] | 84.2% | 18 | 0 | 5.8ms |
-| **`learned_no_comm`** | Decentralized Q-Learner (No Comm) | **16.7%** [9.3%, 28.0%] | 29.5% | 5 | 45 | 23.2ms |
+| **`hybrid_comm`** | Local Horizon ($R \le 2.0$) + Safety Guard | **98.3%** [91.1%, 99.7%] | **98.4%** | 1 | 0 | 6.4ms |
+| **`cbs`** (MAPF) | Offline Space-Time A* + Constraint Tree | **83.3%** [72.0%, 90.7%] | 89.5% | 10 | 0 | 33.8ms |
+| **`centralized`** | Omniscient Centralized Arbiter | **73.3%** [61.0%, 82.9%] | 82.6% | 0 | 16 | 14.9ms |
+| **`heuristic`** | Robust BFS Graph Search | **73.3%** [61.0%, 82.9%] | 82.6% | 0 | 16 | 14.9ms |
+| **`learned_comm`** | Decentralized Q-Learner + Intent Vectors | **70.0%** [57.5%, 80.1%] | 84.2% | 18 | 0 | 5.3ms |
+| **`learned_no_comm`** | Decentralized Q-Learner (No Comm) | **16.7%** [9.3%, 28.0%] | 29.5% | 2 | 48 | 22.0ms |
 
 ### Key Scientific Insights
 1. **Classical MAPF vs. Energy Constraints:** Standard CBS excels at geometric collision avoidance (100% on `TEST_H01`–`TEST_H05`), but fails on `TEST_H06` (0% completion, 10/10 exhaustions). Because classical MAPF assumes unconstrained energy, CBS selects the direct 7-step path without detouring to the recharge alcove. WorldSim's `hybrid_comm` recognizes battery exhaustion risk and achieves 100% completion by queuing at the recharge alcove.
@@ -125,7 +125,7 @@ python run_viewer.py --scenario U14 --policy hybrid_comm --port 8080
 
 To evaluate policy robustness and generalization, models were benchmarked across **6 diverse challenge environments** using **20 independent random seeds per scenario** (120 evaluation episodes per policy).
 
-Full results and methodology are documented in [`reports/GENERALIZATION_STRESS_REPORT.md`](file:///d:/SimWorld/reports/GENERALIZATION_STRESS_REPORT.md) and [`benchmarks/multi_seed_generalization_results.json`](file:///d:/SimWorld/benchmarks/multi_seed_generalization_results.json).
+Full results and methodology are documented in [`reports/GENERALIZATION_STRESS_REPORT.md`](reports/GENERALIZATION_STRESS_REPORT.md) and [`benchmarks/multi_seed_generalization_results.json`](benchmarks/multi_seed_generalization_results.json).
 
 ### Comparative Performance Matrix (20 Seeds per Scenario)
 
@@ -219,7 +219,7 @@ SimWorld/
 │   ├── GENERALIZATION_STRESS_REPORT.md
 │   └── ...
 │
-├── tests/                    # Comprehensive automated test suite (272 unit & integration tests)
+├── tests/                    # Comprehensive automated test suite (279 unit & integration tests)
 ├── docs/                     # Documentation archive & historical research audits
 │   └── RESEARCH_HISTORY.md   # Chronological research logs (Phases 1 through 15)
 │
@@ -244,11 +244,11 @@ python run_viewer.py
 Open **[http://localhost:8000](http://localhost:8000)** in your browser.
 
 ### 2. Run the Full Test Suite
-Execute all 272 automated unit and integration tests:
+Execute all 279 automated unit and integration tests:
 ```bash
 python -m pytest
 ```
-*Expected output: `272 passed in ~10s`.*
+*Expected output: `279 passed in ~10s`.*
 
 ### 3. Run the Held-Out Generalization & MAPF Benchmark
 Execute the complete held-out evaluation across 6 novel scenarios, 6 policies, and 10 evaluation seeds (360 episodes) with Wilson confidence intervals:
@@ -272,7 +272,7 @@ WorldSim's viewer is a stateful simulation and can be deployed with one click to
 1. Fork or push this repository to GitHub.
 2. Sign in to [Render.com](https://render.com) and click **New +** → **Web Service**.
 3. Select your repository (`WorldSim`).
-4. Render detects the included [`Procfile`](file:///d:/SimWorld/Procfile) and [`Dockerfile`](file:///d:/SimWorld/Dockerfile) automatically.
+4. Render detects the included [`Procfile`](Procfile) and [`Dockerfile`](Dockerfile) automatically.
 5. Set **Start Command** (if manual):
    ```bash
    python run_viewer.py --host 0.0.0.0 --port $PORT --no-browser
@@ -293,9 +293,9 @@ docker run -p 8000:8000 worldsim
 ## Research History & Documentation
 
 For detailed mathematical proofs, diagnostic logs, and phase-by-phase development audits from Phase 1.0 to Phase 15.0, refer to the documentation archive:
-* [`docs/RESEARCH_HISTORY.md`](file:///d:/SimWorld/docs/RESEARCH_HISTORY.md): Detailed phase-by-phase scientific audit archive.
-* [`reports/GENERALIZATION_STRESS_REPORT.md`](file:///d:/SimWorld/reports/GENERALIZATION_STRESS_REPORT.md): Multi-seed statistical benchmark report.
-* [`reports/PHASE15_VERIFICATION_REPORT.md`](file:///d:/SimWorld/reports/PHASE15_VERIFICATION_REPORT.md): End-to-end verification and headless browser audit.
+* [`docs/RESEARCH_HISTORY.md`](docs/RESEARCH_HISTORY.md): Detailed phase-by-phase scientific audit archive.
+* [`reports/GENERALIZATION_STRESS_REPORT.md`](reports/GENERALIZATION_STRESS_REPORT.md): Multi-seed statistical benchmark report.
+* [`reports/PHASE15_VERIFICATION_REPORT.md`](reports/PHASE15_VERIFICATION_REPORT.md): End-to-end verification and headless browser audit.
 
 ---
 
