@@ -19,8 +19,8 @@ from worldsim.coordination import MultiAgentCoordinator
 from worldsim.models import Observation, Position, Resource
 from worldsim.multi_agent import AgentConfig, MultiAgentSimulation, MultiAgentWorldConfig
 from worldsim.robust_policy import AgentMemory, ResourceUtilityEvaluator, RobustResourcePolicy
-from phase13_5_unseen_audit import build_all_unseen_scenarios, make_robust_factory
-from phase14_2_local_horizon_eval import run_unseen_scenario_eval
+from experiments.phase13_5_unseen_audit import build_all_unseen_scenarios, make_robust_factory
+from experiments.phase14_2_local_horizon_eval import run_unseen_scenario_eval
 
 
 class TestLocalHorizonRemediation(unittest.TestCase):

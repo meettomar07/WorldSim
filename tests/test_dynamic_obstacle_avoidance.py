@@ -31,8 +31,8 @@ from worldsim.multi_agent import (
     MultiAgentWorldConfig,
 )
 from worldsim.robust_policy import AgentMemory, RobustResourcePolicy
-from phase13_5_unseen_audit import build_all_unseen_scenarios
-from phase14_2_local_horizon_eval import run_unseen_scenario_eval
+from experiments.phase13_5_unseen_audit import build_all_unseen_scenarios
+from experiments.phase14_2_local_horizon_eval import run_unseen_scenario_eval
 
 
 class TestDynamicObstacleAvoidance(unittest.TestCase):

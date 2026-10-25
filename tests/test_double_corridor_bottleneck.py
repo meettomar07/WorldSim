@@ -34,7 +34,7 @@ from worldsim.coordination import (
 )
 from worldsim.linear_learning import LinearLearningConfig, LinearLearningRunner
 from worldsim.models import Position, Resource
-from phase13_5_unseen_audit import (
+from experiments.phase13_5_unseen_audit import (
     build_all_unseen_scenarios,
     make_robust_factory,
     run_scenario_audit_batch,

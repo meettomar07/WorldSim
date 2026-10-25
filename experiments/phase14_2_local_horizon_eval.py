@@ -39,13 +39,22 @@ from worldsim.multi_agent import (
     MultiAgentWorldConfig,
 )
 from worldsim.robust_policy import RobustResourcePolicy
-from phase13_5_unseen_audit import (
-    PrePositionedEntity,
-    UnseenScenarioSpec,
-    build_all_unseen_scenarios,
-    detect_trajectory_oscillations,
-    make_robust_factory as make_unseen_robust_factory,
-)
+try:
+    from experiments.phase13_5_unseen_audit import (
+        PrePositionedEntity,
+        UnseenScenarioSpec,
+        build_all_unseen_scenarios,
+        detect_trajectory_oscillations,
+        make_robust_factory as make_unseen_robust_factory,
+    )
+except ImportError:
+    from phase13_5_unseen_audit import (
+        PrePositionedEntity,
+        UnseenScenarioSpec,
+        build_all_unseen_scenarios,
+        detect_trajectory_oscillations,
+        make_robust_factory as make_unseen_robust_factory,
+    )
 from worldsim.multi_agent_experiment_phase13_5 import (
     make_robust_factory as make_baseline_robust_factory,
     run_phase13_5_episode,
