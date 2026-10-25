@@ -100,7 +100,7 @@ def get_cached_learned_model(communication: bool = True) -> DecentralizedQLearne
         if communication:
             if _CACHED_LEARNED_COMM is None:
                 learner = DecentralizedQLearner(config=DecentralizedLearningConfig(), seed=42)
-                weights_path = Path("phase14_4_weights_comm.json")
+                weights_path = Path("benchmarks/phase14_4_weights_comm.json") if Path("benchmarks/phase14_4_weights_comm.json").exists() else Path("phase14_4_weights_comm.json")
                 if weights_path.exists():
                     try:
                         learner.load_weights(weights_path)
@@ -111,7 +111,7 @@ def get_cached_learned_model(communication: bool = True) -> DecentralizedQLearne
         else:
             if _CACHED_LEARNED_NO_COMM is None:
                 learner = DecentralizedQLearner(config=DecentralizedLearningConfig(), seed=42)
-                weights_path = Path("phase14_4_weights_no_comm.json")
+                weights_path = Path("benchmarks/phase14_4_weights_no_comm.json") if Path("benchmarks/phase14_4_weights_no_comm.json").exists() else Path("phase14_4_weights_no_comm.json")
                 if weights_path.exists():
                     try:
                         learner.load_weights(weights_path)
@@ -271,7 +271,10 @@ class SimulationSession:
             repo_dir = Path(__file__).resolve().parent.parent
             if str(repo_dir) not in sys.path:
                 sys.path.insert(0, str(repo_dir))
-            from phase14_3_dynamic_obstacle_eval import build_controlled_dynamic_scenarios
+            try:
+                from experiments.phase14_3_dynamic_obstacle_eval import build_controlled_dynamic_scenarios
+            except ImportError:
+                from phase14_3_dynamic_obstacle_eval import build_controlled_dynamic_scenarios
             for scen in build_controlled_dynamic_scenarios():
                 registry[scen["id"]] = {
                     "id": scen["id"],
@@ -293,7 +296,10 @@ class SimulationSession:
             repo_dir = Path(__file__).resolve().parent.parent
             if str(repo_dir) not in sys.path:
                 sys.path.insert(0, str(repo_dir))
-            from phase13_5_unseen_audit import build_all_unseen_scenarios
+            try:
+                from experiments.phase13_5_unseen_audit import build_all_unseen_scenarios
+            except ImportError:
+                from phase13_5_unseen_audit import build_all_unseen_scenarios
             for spec, pre_positioned in build_all_unseen_scenarios():
                 active_agents = [
                     AgentConfig(

@@ -40,8 +40,12 @@ from worldsim.multi_agent import (
     MultiAgentWorldConfig,
 )
 from worldsim.robust_policy import RobustResourcePolicy
-from phase13_5_unseen_audit import build_all_unseen_scenarios
-from phase14_2_local_horizon_eval import run_unseen_scenario_eval
+try:
+    from experiments.phase13_5_unseen_audit import build_all_unseen_scenarios
+    from experiments.phase14_2_local_horizon_eval import run_unseen_scenario_eval
+except ImportError:
+    from phase13_5_unseen_audit import build_all_unseen_scenarios
+    from phase14_2_local_horizon_eval import run_unseen_scenario_eval
 
 
 @dataclass

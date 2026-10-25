@@ -188,11 +188,11 @@ class TestDecentralizedLearning(unittest.TestCase):
 
     def test_remediated_policy_d04_recharge_contention(self) -> None:
         """9. Verify remediated learned policy completes D04 with zero exhaustions."""
-        from phase14_3_dynamic_obstacle_eval import build_controlled_dynamic_scenarios
+        from experiments.phase14_3_dynamic_obstacle_eval import build_controlled_dynamic_scenarios
 
         scen_d04 = build_controlled_dynamic_scenarios()[3]
         learner = DecentralizedQLearner()
-        weights_path = Path("phase14_4_weights_comm.json")
+        weights_path = Path("benchmarks/phase14_4_weights_comm.json") if Path("benchmarks/phase14_4_weights_comm.json").exists() else Path("phase14_4_weights_comm.json")
         if weights_path.exists():
             learner.load_weights(weights_path)
 
@@ -247,7 +247,7 @@ class TestDecentralizedLearning(unittest.TestCase):
 
     def test_remediated_policy_u06_quadrant_mesh(self) -> None:
         """10. Verify remediated learned policy completes U06 quadrant mesh with zero exhaustions."""
-        from phase13_5_unseen_audit import build_all_unseen_scenarios
+        from experiments.phase13_5_unseen_audit import build_all_unseen_scenarios
 
         unseen = {s[0].scenario_id: s for s in build_all_unseen_scenarios()}
         u06_spec, _ = unseen["U06"]
@@ -268,7 +268,7 @@ class TestDecentralizedLearning(unittest.TestCase):
         aids = [a["id"] for a in u06_spec.active_agents]
 
         learner = DecentralizedQLearner()
-        weights_path = Path("phase14_4_weights_comm.json")
+        weights_path = Path("benchmarks/phase14_4_weights_comm.json") if Path("benchmarks/phase14_4_weights_comm.json").exists() else Path("phase14_4_weights_comm.json")
         if weights_path.exists():
             learner.load_weights(weights_path)
 
@@ -321,7 +321,7 @@ class TestDecentralizedLearning(unittest.TestCase):
 
     def test_hybrid_policy_u14_blind_intersection(self) -> None:
         """11. Verify hybrid coordination policy completes U14 blind intersection with zero exhaustions."""
-        from phase13_5_unseen_audit import build_all_unseen_scenarios
+        from experiments.phase13_5_unseen_audit import build_all_unseen_scenarios
 
         unseen = {s[0].scenario_id: s for s in build_all_unseen_scenarios()}
         u14_spec, u14_pre = unseen["U14"]
@@ -341,7 +341,7 @@ class TestDecentralizedLearning(unittest.TestCase):
         aids = [a["id"] for a in u14_spec.active_agents]
 
         learner = DecentralizedQLearner()
-        weights_path = Path("phase14_4_weights_comm.json")
+        weights_path = Path("benchmarks/phase14_4_weights_comm.json") if Path("benchmarks/phase14_4_weights_comm.json").exists() else Path("phase14_4_weights_comm.json")
         if weights_path.exists():
             learner.load_weights(weights_path)
 
@@ -393,11 +393,11 @@ class TestDecentralizedLearning(unittest.TestCase):
 
     def test_hybrid_policy_d03_deadlock_reduction(self) -> None:
         """12. Verify hybrid coordination policy reduces deadlocks and blocked attempts in D03."""
-        from phase14_3_dynamic_obstacle_eval import build_controlled_dynamic_scenarios
+        from experiments.phase14_3_dynamic_obstacle_eval import build_controlled_dynamic_scenarios
 
         scen_d03 = build_controlled_dynamic_scenarios()[2]
         learner = DecentralizedQLearner()
-        weights_path = Path("phase14_4_weights_comm.json")
+        weights_path = Path("benchmarks/phase14_4_weights_comm.json") if Path("benchmarks/phase14_4_weights_comm.json").exists() else Path("phase14_4_weights_comm.json")
         if weights_path.exists():
             learner.load_weights(weights_path)
 
@@ -455,11 +455,11 @@ class TestDecentralizedLearning(unittest.TestCase):
 
     def test_transparent_controller_decision_tracking(self) -> None:
         """13. Verify transparent logging and reporting of learned vs safety_guard decision counts."""
-        from phase14_3_dynamic_obstacle_eval import build_controlled_dynamic_scenarios
+        from experiments.phase14_3_dynamic_obstacle_eval import build_controlled_dynamic_scenarios
 
         scen_d04 = build_controlled_dynamic_scenarios()[3]
         learner = DecentralizedQLearner()
-        weights_path = Path("phase14_4_weights_comm.json")
+        weights_path = Path("benchmarks/phase14_4_weights_comm.json") if Path("benchmarks/phase14_4_weights_comm.json").exists() else Path("phase14_4_weights_comm.json")
         if weights_path.exists():
             learner.load_weights(weights_path)
 
@@ -516,7 +516,7 @@ class TestDecentralizedLearning(unittest.TestCase):
 
     def test_u14_remediated_policy_doorway_deadlock_reproduction(self) -> None:
         """14. Reproduce and assert the U14 doorway deadlock under remediated learned policy."""
-        from phase13_5_unseen_audit import build_all_unseen_scenarios
+        from experiments.phase13_5_unseen_audit import build_all_unseen_scenarios
 
         unseen = {s[0].scenario_id: s for s in build_all_unseen_scenarios()}
         u14_spec, u14_pre = unseen["U14"]
@@ -536,7 +536,7 @@ class TestDecentralizedLearning(unittest.TestCase):
         aids = [a["id"] for a in u14_spec.active_agents]
 
         learner = DecentralizedQLearner()
-        weights_path = Path("phase14_4_weights_comm.json")
+        weights_path = Path("benchmarks/phase14_4_weights_comm.json") if Path("benchmarks/phase14_4_weights_comm.json").exists() else Path("phase14_4_weights_comm.json")
         if weights_path.exists():
             learner.load_weights(weights_path)
 
@@ -596,7 +596,7 @@ class TestDecentralizedLearning(unittest.TestCase):
 
     def test_u14_hybrid_policy_divergence_and_resolution(self) -> None:
         """15. Verify that hybrid policy detects deadlock at tick 4, diverges, and achieves 100% completion."""
-        from phase13_5_unseen_audit import build_all_unseen_scenarios
+        from experiments.phase13_5_unseen_audit import build_all_unseen_scenarios
 
         unseen = {s[0].scenario_id: s for s in build_all_unseen_scenarios()}
         u14_spec, u14_pre = unseen["U14"]
@@ -616,7 +616,7 @@ class TestDecentralizedLearning(unittest.TestCase):
         aids = [a["id"] for a in u14_spec.active_agents]
 
         learner = DecentralizedQLearner()
-        weights_path = Path("phase14_4_weights_comm.json")
+        weights_path = Path("benchmarks/phase14_4_weights_comm.json") if Path("benchmarks/phase14_4_weights_comm.json").exists() else Path("phase14_4_weights_comm.json")
         if weights_path.exists():
             learner.load_weights(weights_path)
 

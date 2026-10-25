@@ -53,8 +53,12 @@ from worldsim.multi_agent import (
     MultiAgentWorldConfig,
 )
 from worldsim.robust_policy import RobustResourcePolicy
-from phase13_5_unseen_audit import build_all_unseen_scenarios, make_robust_factory
-from phase14_3_dynamic_obstacle_eval import build_controlled_dynamic_scenarios
+try:
+    from experiments.phase13_5_unseen_audit import build_all_unseen_scenarios, make_robust_factory
+    from experiments.phase14_3_dynamic_obstacle_eval import build_controlled_dynamic_scenarios
+except ImportError:
+    from phase13_5_unseen_audit import build_all_unseen_scenarios, make_robust_factory
+    from phase14_3_dynamic_obstacle_eval import build_controlled_dynamic_scenarios
 
 
 @dataclass

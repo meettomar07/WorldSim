@@ -212,7 +212,7 @@ print(",".join(winners))
 
     def test_end_to_end_u09_telemetry(self) -> None:
         """8. End-to-end U09: prove queue waits are classified as cooperative waiting with 0 unresolved structural deadlocks."""
-        from phase13_5_unseen_audit import build_all_unseen_scenarios, make_robust_factory
+        from experiments.phase13_5_unseen_audit import build_all_unseen_scenarios, make_robust_factory
         from worldsim.config import WorldConfig
         from worldsim.linear_learning import LinearLearningConfig, LinearLearningRunner
 
@@ -268,7 +268,7 @@ print(",".join(winners))
     def test_end_to_end_u14_telemetry(self) -> None:
         """9. End-to-end U14: prove doorway waits are classified as cooperative waiting with 0 unresolved deadlocks."""
         from dataclasses import replace
-        from phase13_5_unseen_audit import build_all_unseen_scenarios, make_robust_factory
+        from experiments.phase13_5_unseen_audit import build_all_unseen_scenarios, make_robust_factory
         from worldsim.config import WorldConfig
         from worldsim.linear_learning import LinearLearningConfig, LinearLearningRunner
 
