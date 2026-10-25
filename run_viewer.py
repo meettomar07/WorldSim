@@ -23,6 +23,7 @@ Options:
 """
 
 import argparse
+import os
 import sys
 import time
 
@@ -34,8 +35,11 @@ def main() -> None:
         description="WorldSim Live 2D World Viewer (Phase 15.0)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--host", default="127.0.0.1", help="Host interface to bind (default: 127.0.0.1)")
-    parser.add_argument("--port", type=int, default=8000, help="Port to bind (default: 8000)")
+    default_host = os.environ.get("HOST", "127.0.0.1")
+    default_port = int(os.environ.get("PORT", "8000"))
+
+    parser.add_argument("--host", default=default_host, help=f"Host interface to bind (default: {default_host})")
+    parser.add_argument("--port", type=int, default=default_port, help=f"Port to bind (default: {default_port})")
     parser.add_argument(
         "--scenario",
         default="D01",
