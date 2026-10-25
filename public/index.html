@@ -1,0 +1,1465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:,">
+  <title>WorldSim — Live 2D World Viewer</title>
+  <style>
+    :root {
+      --bg-dark: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-header: #1f2937;
+      --bg-hover: #1e293b;
+      --border-color: #334155;
+      --border-accent: #3b82f6;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #3b82f6;
+      --accent-green: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-orange: #f97316;
+      --accent-red: #ef4444;
+      --accent-purple: #8b5cf6;
+      --accent-cyan: #06b6d4;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Top Navigation Header */
+    header {
+      background-color: var(--bg-card);
+      border-bottom: 1px solid var(--border-color);
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand h1 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: #fff;
+    }
+
+    .brand .version-badge {
+      background: linear-gradient(135deg, #2563eb, #7c3aed);
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+    }
+
+    .status-pill {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .status-running { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
+    .status-paused { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #f59e0b; }
+    .status-completed { background: rgba(6, 182, 212, 0.2); color: #22d3ee; border: 1px solid #06b6d4; }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    button {
+      background-color: #1e293b;
+      color: #f8fafc;
+      border: 1px solid var(--border-color);
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    button:hover {
+      background-color: #334155;
+      border-color: #475569;
+    }
+
+    button.btn-primary {
+      background: #2563eb;
+      border-color: #3b82f6;
+    }
+    button.btn-primary:hover {
+      background: #1d4ed8;
+    }
+
+    button.btn-success {
+      background: #059669;
+      border-color: #10b981;
+    }
+    button.btn-success:hover {
+      background: #047857;
+    }
+
+    button.btn-danger {
+      background: #dc2626;
+      border-color: #ef4444;
+    }
+
+    .speed-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      background: #0f172a;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+    }
+    .speed-control input[type="range"] {
+      width: 90px;
+      accent-color: var(--accent-blue);
+      cursor: pointer;
+    }
+
+    /* Main Container Split View */
+    .app-main {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* Canvas Viewport */
+    .viewport-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      background: radial-gradient(circle at center, #0f172a 0%, #060911 100%);
+      overflow: hidden;
+    }
+
+    .canvas-wrapper {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      position: relative;
+    }
+
+    canvas {
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      background-color: #0b1120;
+      cursor: crosshair;
+    }
+
+    .viewport-overlay-legend {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 8px 14px;
+      display: flex;
+      gap: 16px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      z-index: 5;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+    }
+
+    /* Sidebar / Panels */
+    .sidebar {
+      width: 420px;
+      background-color: var(--bg-card);
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .panel-card {
+      border-bottom: 1px solid var(--border-color);
+      padding: 14px 16px;
+    }
+
+    .panel-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Form Controls */
+    .form-group {
+      margin-bottom: 10px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    select, input[type="number"], input[type="text"] {
+      width: 100%;
+      background: #0b1120;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 7px 10px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      outline: none;
+    }
+    select:focus, input:focus {
+      border-color: var(--accent-blue);
+    }
+
+    .form-row {
+      display: flex;
+      gap: 8px;
+    }
+    .form-row .form-group {
+      flex: 1;
+    }
+
+    /* Overlays Checkboxes */
+    .overlay-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 12px;
+      margin-top: 8px;
+      font-size: 0.78rem;
+    }
+    .overlay-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      color: #cbd5e1;
+    }
+    .overlay-item input[type="checkbox"] {
+      accent-color: var(--accent-blue);
+      cursor: pointer;
+    }
+
+    /* Telemetry Metric Cards */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .metric-box {
+      background: #0b1120;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 8px 10px;
+      text-align: center;
+    }
+    .metric-value {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #fff;
+      margin-top: 2px;
+    }
+    .metric-label {
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    /* Critical Invariant Banner */
+    .safety-invariant-banner {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid #059669;
+      border-radius: 6px;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .safety-invariant-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #34d399;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .safety-invariant-val {
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: #10b981;
+    }
+
+    /* Conflict / Attempts Breakdown */
+    .conflict-breakdown {
+      display: flex;
+      justify-content: space-between;
+      background: #0b1120;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+    .conflict-item span {
+      font-weight: 700;
+      color: #f1f5f9;
+    }
+
+    /* Decision Attribution Bar */
+    .decision-bar-container {
+      margin-top: 4px;
+    }
+    .decision-bar-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.74rem;
+      margin-bottom: 4px;
+    }
+    .decision-bar-track {
+      height: 7px;
+      border-radius: 4px;
+      background: #1e293b;
+      overflow: hidden;
+      display: flex;
+    }
+    .decision-bar-learned { background: var(--accent-purple); height: 100%; transition: width 0.2s; }
+    .decision-bar-safety { background: var(--accent-amber); height: 100%; transition: width 0.2s; }
+    .decision-bar-heuristic { background: var(--accent-blue); height: 100%; transition: width 0.2s; }
+
+    /* Agent Inspector Card */
+    .inspector-card {
+      background: #0b1120;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .inspector-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .inspector-agent-tag {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+    .agent-avatar-circle {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+    }
+    .badge {
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .badge-learned { background: rgba(139, 92, 246, 0.25); color: #c084fc; border: 1px solid #8b5cf6; }
+    .badge-safety { background: rgba(245, 158, 11, 0.25); color: #fcd34d; border: 1px solid #f59e0b; }
+    .badge-heuristic { background: rgba(59, 130, 246, 0.25); color: #93c5fd; border: 1px solid #3b82f6; }
+
+    .battery-container {
+      margin: 10px 0;
+    }
+    .battery-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      margin-bottom: 3px;
+    }
+    .battery-bar {
+      height: 8px;
+      background: #1e293b;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .battery-fill {
+      height: 100%;
+      background: var(--accent-green);
+      transition: width 0.2s;
+    }
+
+    .inspector-details {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      font-size: 0.76rem;
+      margin-top: 10px;
+    }
+    .detail-item {
+      background: #111827;
+      padding: 6px 8px;
+      border-radius: 4px;
+      border: 1px solid #1f2937;
+    }
+    .detail-title {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+    }
+    .detail-val {
+      font-weight: 600;
+      color: #fff;
+      margin-top: 2px;
+    }
+
+    /* Event Stream Log */
+    .log-stream {
+      background: #0b1120;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      height: 140px;
+      overflow-y: auto;
+      padding: 8px 10px;
+      font-family: monospace;
+      font-size: 0.72rem;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .log-entry {
+      color: #94a3b8;
+      line-height: 1.3;
+    }
+    .log-entry:last-child {
+      color: #38bdf8;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header>
+    <div class="brand">
+      <h1>WORLDSIM</h1>
+      <span class="version-badge">Phase 15.0 Live 2D</span>
+      <div id="statusBadge" class="status-pill status-paused">
+        <span style="font-size: 1rem;">&#9679;</span> <span id="statusText">READY</span>
+      </div>
+      <span id="scenarioHeadline" style="font-size: 0.82rem; color: #94a3b8; font-weight: 500;">
+        D01: Dual Patrol Chokepoint Crossing
+      </span>
+    </div>
+
+    <div class="header-controls">
+      <div class="speed-control">
+        <span>Speed</span>
+        <input type="range" id="speedSlider" min="50" max="1000" step="25" value="350">
+        <span id="speedVal">350ms</span>
+      </div>
+      <button id="btnPlayPause" class="btn-primary">
+        <span id="playIcon">&#9654;</span> <span id="playText">Play</span>
+      </button>
+      <button id="btnStep">
+        <span>&#9654;&#10073;</span> Step Tick
+      </button>
+      <button id="btnReset" class="btn-danger">
+        <span>&#8635;</span> Reset
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Viewport and Sidebar -->
+  <div class="app-main">
+    
+    <!-- Canvas Viewport -->
+    <div class="viewport-container">
+      <div class="canvas-wrapper">
+        <canvas id="worldCanvas"></canvas>
+      </div>
+
+      <div class="viewport-overlay-legend">
+        <div class="legend-item">
+          <div class="legend-color" style="background: #334155; border: 1px solid #64748b;"></div>
+          <span>Wall / Pillar</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #10b981; box-shadow: 0 0 6px #10b981;"></div>
+          <span>Recharge Pad (+6)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #f97316;"></div>
+          <span>Moving Dynamic Obstacle</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #3b82f6; border-radius: 50%;"></div>
+          <span>Autonomous Agent</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="border: 2px dashed #06b6d4; background: transparent;"></div>
+          <span>Intent Vector</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Control & Telemetry Sidebar -->
+    <div class="sidebar">
+
+      <!-- Scenario & Policy Selection -->
+      <div class="panel-card">
+        <div class="panel-title">
+          <span>Simulation Configuration</span>
+        </div>
+        <div class="form-group">
+          <label for="scenarioSelect">Scenario</label>
+          <select id="scenarioSelect"></select>
+        </div>
+        <div class="form-group">
+          <label for="policySelect">Coordination Policy</label>
+          <select id="policySelect"></select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="seedInput">RNG Seed</label>
+            <input type="number" id="seedInput" value="42">
+          </div>
+          <div class="form-group" style="display: flex; align-items: flex-end;">
+            <button id="btnApplyConfig" class="btn-primary" style="width: 100%; justify-content: center;">
+              Load Scenario
+            </button>
+          </div>
+        </div>
+
+        <div style="margin-top: 12px;">
+          <div class="panel-title" style="margin-bottom: 6px; font-size: 0.74rem;">Toggleable Overlays</div>
+          <div class="overlay-grid">
+            <label class="overlay-item">
+              <input type="checkbox" id="chkTrails" checked> Path Trails
+            </label>
+            <label class="overlay-item">
+              <input type="checkbox" id="chkVision" checked> Vision (R &le; 2.0)
+            </label>
+            <label class="overlay-item">
+              <input type="checkbox" id="chkComm" checked> Comm & Intent
+            </label>
+            <label class="overlay-item">
+              <input type="checkbox" id="chkDynVectors" checked> Obstacle Vectors
+            </label>
+            <label class="overlay-item">
+              <input type="checkbox" id="chkConflicts" checked> Conflict Badges
+            </label>
+            <label class="overlay-item">
+              <input type="checkbox" id="chkTargets" checked> Target Lines
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Telemetry & Metrics -->
+      <div class="panel-card">
+        <div class="panel-title">
+          <span>Authoritative Telemetry</span>
+          <span id="tickBadge" style="font-size: 0.74rem; font-weight: 700; color: #38bdf8;">Tick: 0</span>
+        </div>
+
+        <!-- Authoritative Safety Invariant -->
+        <div class="safety-invariant-banner">
+          <div class="safety-invariant-title">
+            <span>&#10003;</span> Physical Overlap Violations
+          </div>
+          <div class="safety-invariant-val">0 (STRICT INVARIANT)</div>
+        </div>
+
+        <div class="metrics-grid">
+          <div class="metric-box">
+            <div class="metric-label">Completed</div>
+            <div class="metric-value" id="valCompletion">0%</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Conflict Attempts</div>
+            <div class="metric-value" id="valConflicts" style="color: #f59e0b;">0</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Deadlocks</div>
+            <div class="metric-value" id="valDeadlocks" style="color: #ef4444;">0</div>
+          </div>
+        </div>
+
+        <!-- Conflict Attempts Breakdown -->
+        <div class="conflict-breakdown">
+          <div class="conflict-item">Vertex: <span id="valVertex">0</span></div>
+          <div class="conflict-item">Swap: <span id="valSwap">0</span></div>
+          <div class="conflict-item">Occupied: <span id="valOccupied">0</span></div>
+          <div class="conflict-item">Dynamic: <span id="valDynamic">0</span></div>
+        </div>
+
+        <!-- Cumulative Decision Attribution -->
+        <div class="decision-bar-container">
+          <div class="decision-bar-label">
+            <span style="color: #c084fc;">Learned: <b id="valDecLearned">0</b></span>
+            <span style="color: #fcd34d;">Safety Guard: <b id="valDecSafety">0</b></span>
+          </div>
+          <div class="decision-bar-track">
+            <div id="barLearned" class="decision-bar-learned" style="width: 50%;"></div>
+            <div id="barSafety" class="decision-bar-safety" style="width: 50%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Agent Inspector Card -->
+      <div class="panel-card">
+        <div class="panel-title">
+          <span>Agent Inspector</span>
+          <span style="font-size: 0.7rem; color: #64748b;">Click agent to inspect</span>
+        </div>
+
+        <div class="inspector-card" id="inspectorCard">
+          <div class="inspector-header">
+            <div class="inspector-agent-tag">
+              <div class="agent-avatar-circle" id="insAvatar" style="background: #3b82f6;"></div>
+              <span id="insAgentId">agent_w</span>
+            </div>
+            <div id="insAttribution" class="badge badge-learned">LEARNED</div>
+          </div>
+
+          <div class="battery-container">
+            <div class="battery-header">
+              <span>Energy Reservoir</span>
+              <span id="insEnergyVal">10 / 10</span>
+            </div>
+            <div class="battery-bar">
+              <div id="insEnergyFill" class="battery-fill" style="width: 100%;"></div>
+            </div>
+          </div>
+
+          <div class="inspector-details">
+            <div class="detail-item">
+              <div class="detail-title">Current Cell</div>
+              <div class="detail-val" id="insPos">(0, 2)</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-title">Target Goal</div>
+              <div class="detail-val" id="insTarget">(7, 2)</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-title">Last Action</div>
+              <div class="detail-val" id="insAction">RIGHT</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-title">Action Result</div>
+              <div class="detail-val" id="insResult" style="color: #34d399;">Success</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-title">Communicated Intent</div>
+              <div class="detail-val" id="insIntent">(1, 2)</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-title">Visible Peers (R &le; 2)</div>
+              <div class="detail-val" id="insPeers">None</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Event Stream Log -->
+      <div class="panel-card" style="border-bottom: none; flex: 1;">
+        <div class="panel-title">Live Event Stream</div>
+        <div class="log-stream" id="logStream">
+          <div class="log-entry">Waiting for simulation...</div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Client-Side Real-Time Rendering & Communication Script -->
+  <script>
+    // Palettes
+    const AGENT_COLORS = [
+      "#3b82f6", // Blue
+      "#f43f5e", // Rose
+      "#8b5cf6", // Purple
+      "#10b981", // Emerald
+      "#f59e0b", // Amber
+      "#06b6d4", // Cyan
+      "#ec4899", // Pink
+      "#84cc16", // Lime
+      "#eab308", // Yellow
+      "#a855f7"  // Violet
+    ];
+
+    let state = null;
+    let isPlaying = false;
+    let playTimer = null;
+    let tickSpeedMs = 350;
+    let selectedAgentId = null;
+    let animationProgress = 1.0;
+    let animStartTime = 0;
+
+    const canvas = document.getElementById("worldCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // UI Elements
+    const btnPlayPause = document.getElementById("btnPlayPause");
+    const playIcon = document.getElementById("playIcon");
+    const playText = document.getElementById("playText");
+    const btnStep = document.getElementById("btnStep");
+    const btnReset = document.getElementById("btnReset");
+    const speedSlider = document.getElementById("speedSlider");
+    const speedVal = document.getElementById("speedVal");
+    const scenarioSelect = document.getElementById("scenarioSelect");
+    const policySelect = document.getElementById("policySelect");
+    const seedInput = document.getElementById("seedInput");
+    const btnApplyConfig = document.getElementById("btnApplyConfig");
+    const statusBadge = document.getElementById("statusBadge");
+    const statusText = document.getElementById("statusText");
+    const scenarioHeadline = document.getElementById("scenarioHeadline");
+    const tickBadge = document.getElementById("tickBadge");
+    const valCompletion = document.getElementById("valCompletion");
+    const valConflicts = document.getElementById("valConflicts");
+    const valDeadlocks = document.getElementById("valDeadlocks");
+    const valVertex = document.getElementById("valVertex");
+    const valSwap = document.getElementById("valSwap");
+    const valOccupied = document.getElementById("valOccupied");
+    const valDynamic = document.getElementById("valDynamic");
+    const valDecLearned = document.getElementById("valDecLearned");
+    const valDecSafety = document.getElementById("valDecSafety");
+    const barLearned = document.getElementById("barLearned");
+    const barSafety = document.getElementById("barSafety");
+    const logStream = document.getElementById("logStream");
+
+    // Overlays
+    const chkTrails = document.getElementById("chkTrails");
+    const chkVision = document.getElementById("chkVision");
+    const chkComm = document.getElementById("chkComm");
+    const chkDynVectors = document.getElementById("chkDynVectors");
+    const chkConflicts = document.getElementById("chkConflicts");
+    const chkTargets = document.getElementById("chkTargets");
+
+    // Setup Listeners
+    speedSlider.addEventListener("input", (e) => {
+      tickSpeedMs = parseInt(e.target.value, 10);
+      speedVal.innerText = `${tickSpeedMs}ms`;
+      if (isPlaying) {
+        clearInterval(playTimer);
+        playTimer = setInterval(doStep, tickSpeedMs);
+      }
+    });
+
+    btnPlayPause.addEventListener("click", togglePlayPause);
+    btnStep.addEventListener("click", () => { pause(); doStep(); });
+    btnReset.addEventListener("click", () => { pause(); doReset(); });
+    btnApplyConfig.addEventListener("click", () => { pause(); doApplyConfig(); });
+
+    // Keyboard Shortcuts
+    window.addEventListener("keydown", (e) => {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+      if (e.code === "Space") {
+        e.preventDefault();
+        togglePlayPause();
+      } else if (e.code === "ArrowRight" || e.code === "KeyN") {
+        e.preventDefault();
+        pause();
+        doStep();
+      } else if (e.code === "KeyR") {
+        e.preventDefault();
+        pause();
+        doReset();
+      }
+    });
+
+    // Canvas click detection for agent inspector
+    canvas.addEventListener("click", (e) => {
+      if (!state) return;
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const clickX = (e.clientX - rect.left) * scaleX;
+      const clickY = (e.clientY - rect.top) * scaleY;
+
+      const cellSize = getCellSize();
+      const gx = Math.floor(clickX / cellSize);
+      const gy = Math.floor(clickY / cellSize);
+
+      // Check if clicked cell has an agent
+      let clickedAgent = null;
+      for (const [aid, ag] of Object.entries(state.agents)) {
+        if (ag.x === gx && ag.y === gy) {
+          clickedAgent = aid;
+          break;
+        }
+      }
+
+      if (clickedAgent) {
+        selectedAgentId = clickedAgent;
+        updateInspector();
+      }
+    });
+
+    // Initialize API Data
+    async function init() {
+      await loadOptions();
+      await fetchState();
+      requestAnimationFrame(renderLoop);
+    }
+
+    async function loadOptions() {
+      try {
+        const [scenRes, polRes] = await Promise.all([
+          fetch("/api/scenarios"),
+          fetch("/api/policies")
+        ]);
+        const scenarios = await scenRes.json();
+        const policies = await polRes.json();
+
+        scenarioSelect.innerHTML = scenarios.map(s => 
+          `<option value="${s.id}">[${s.family}] ${s.name} (${s.width}x${s.height})</option>`
+        ).join("");
+
+        policySelect.innerHTML = policies.map(p => 
+          `<option value="${p.id}">${p.name}</option>`
+        ).join("");
+      } catch (err) {
+        console.error("Failed to load options", err);
+      }
+    }
+
+    async function fetchState() {
+      try {
+        const res = await fetch("/api/state");
+        const data = await res.json();
+        updateState(data);
+      } catch (err) {
+        console.error("Failed to fetch state", err);
+      }
+    }
+
+    async function doStep() {
+      try {
+        const res = await fetch("/api/step", { method: "POST" });
+        const data = await res.json();
+        animStartTime = performance.now();
+        animationProgress = 0.0;
+        updateState(data);
+        if (data.overall_completed) {
+          pause();
+        }
+      } catch (err) {
+        console.error("Failed to step", err);
+      }
+    }
+
+    async function doReset() {
+      try {
+        const res = await fetch("/api/reset", { method: "POST" });
+        const data = await res.json();
+        animStartTime = performance.now();
+        animationProgress = 1.0;
+        updateState(data);
+      } catch (err) {
+        console.error("Failed to reset", err);
+      }
+    }
+
+    async function doApplyConfig() {
+      const payload = {
+        scenario_id: scenarioSelect.value,
+        policy_mode: policySelect.value,
+        seed: parseInt(seedInput.value, 10)
+      };
+      try {
+        const res = await fetch("/api/select", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        animStartTime = performance.now();
+        animationProgress = 1.0;
+        updateState(data);
+      } catch (err) {
+        console.error("Failed to apply config", err);
+      }
+    }
+
+    function togglePlayPause() {
+      if (isPlaying) {
+        pause();
+      } else {
+        play();
+      }
+    }
+
+    function play() {
+      if (state && state.overall_completed) {
+        doReset().then(() => {
+          isPlaying = true;
+          updatePlayUI();
+          playTimer = setInterval(doStep, tickSpeedMs);
+        });
+        return;
+      }
+      isPlaying = true;
+      updatePlayUI();
+      playTimer = setInterval(doStep, tickSpeedMs);
+    }
+
+    function pause() {
+      isPlaying = false;
+      updatePlayUI();
+      if (playTimer) {
+        clearInterval(playTimer);
+        playTimer = null;
+      }
+    }
+
+    function updatePlayUI() {
+      if (isPlaying) {
+        playIcon.innerHTML = "&#10074;&#10074;";
+        playText.innerText = "Pause";
+        btnPlayPause.classList.remove("btn-primary");
+        btnPlayPause.classList.add("btn-success");
+        statusBadge.className = "status-pill status-running";
+        statusText.innerText = "RUNNING";
+      } else {
+        playIcon.innerHTML = "&#9654;";
+        playText.innerText = "Play";
+        btnPlayPause.classList.remove("btn-success");
+        btnPlayPause.classList.add("btn-primary");
+        if (state && state.overall_completed) {
+          statusBadge.className = "status-pill status-completed";
+          statusText.innerText = "COMPLETED";
+        } else {
+          statusBadge.className = "status-pill status-paused";
+          statusText.innerText = "PAUSED";
+        }
+      }
+    }
+
+    function updateState(newState) {
+      state = newState;
+      if (!selectedAgentId || !state.agents[selectedAgentId]) {
+        const firstAgent = Object.keys(state.agents)[0];
+        if (firstAgent) selectedAgentId = firstAgent;
+      }
+
+      // Update Header & Selectors
+      scenarioHeadline.innerText = `${state.scenario.id}: ${state.scenario.name}`;
+      scenarioSelect.value = state.scenario.id;
+      policySelect.value = state.scenario.policy_mode;
+      seedInput.value = state.scenario.seed;
+
+      // Update Telemetry
+      tickBadge.innerText = `Tick: ${state.tick} / ${state.scenario.max_steps}`;
+      valCompletion.innerText = `${state.metrics.completion_rate_pct}% (${state.metrics.reached_agents}/${state.metrics.total_agents})`;
+      valConflicts.innerText = state.metrics.attempted_conflicts;
+      valDeadlocks.innerText = state.metrics.deadlock_events_count;
+      valVertex.innerText = state.metrics.vertex_collisions;
+      valSwap.innerText = state.metrics.swap_collisions;
+      valOccupied.innerText = state.metrics.occupied_collisions;
+      valDynamic.innerText = state.metrics.dynamic_obstacle_collisions;
+
+      // Decision Breakdown
+      const learnedDec = state.metrics.total_learned_decisions;
+      const safetyDec = state.metrics.total_safety_decisions;
+      const totalDec = learnedDec + safetyDec;
+      valDecLearned.innerText = learnedDec;
+      valDecSafety.innerText = safetyDec;
+      if (totalDec > 0) {
+        barLearned.style.width = `${(learnedDec / totalDec) * 100}%`;
+        barSafety.style.width = `${(safetyDec / totalDec) * 100}%`;
+      } else {
+        barLearned.style.width = "50%";
+        barSafety.style.width = "50%";
+      }
+
+      // Update Inspector & Events
+      updateInspector();
+      updateEventLog();
+      updatePlayUI();
+    }
+
+    function updateInspector() {
+      if (!state || !selectedAgentId || !state.agents[selectedAgentId]) return;
+      const ag = state.agents[selectedAgentId];
+      const agentIdx = Object.keys(state.agents).indexOf(selectedAgentId);
+      const color = AGENT_COLORS[agentIdx % AGENT_COLORS.length];
+
+      document.getElementById("insAgentId").innerText = ag.id;
+      document.getElementById("insAvatar").style.background = color;
+
+      const insAttribution = document.getElementById("insAttribution");
+      insAttribution.innerText = ag.decision_attribution;
+      if (ag.decision_attribution.includes("LEARNED")) {
+        insAttribution.className = "badge badge-learned";
+      } else if (ag.decision_attribution.includes("SAFETY")) {
+        insAttribution.className = "badge badge-safety";
+      } else {
+        insAttribution.className = "badge badge-heuristic";
+      }
+
+      document.getElementById("insEnergyVal").innerText = `${ag.energy} / ${ag.max_energy}`;
+      const fillPct = Math.max(0, Math.min(100, (ag.energy / ag.max_energy) * 100));
+      const energyFill = document.getElementById("insEnergyFill");
+      energyFill.style.width = `${fillPct}%`;
+      energyFill.style.background = fillPct > 50 ? "var(--accent-green)" : (fillPct > 25 ? "var(--accent-amber)" : "var(--accent-red)");
+
+      document.getElementById("insPos").innerText = `(${ag.x}, ${ag.y})`;
+      document.getElementById("insTarget").innerText = ag.target ? `(${ag.target.x}, ${ag.target.y})` : "None";
+      document.getElementById("insAction").innerText = ag.action;
+
+      const insResult = document.getElementById("insResult");
+      if (ag.action_success) {
+        insResult.innerText = ag.action_moved ? "Moved" : "Success (Hold)";
+        insResult.style.color = "#34d399";
+      } else {
+        insResult.innerText = `Blocked (${ag.collision_type || "Hold"})`;
+        insResult.style.color = "#f87171";
+      }
+
+      document.getElementById("insIntent").innerText = ag.intent ? `(${ag.intent.x}, ${ag.intent.y})` : "None";
+      document.getElementById("insPeers").innerText = ag.visible_peers.length > 0 ? ag.visible_peers.join(", ") : "None";
+    }
+
+    function updateEventLog() {
+      if (!state || !state.recent_events) return;
+      logStream.innerHTML = state.recent_events.slice(-30).map(evt => 
+        `<div class="log-entry">${evt}</div>`
+      ).join("");
+      logStream.scrollTop = logStream.scrollHeight;
+    }
+
+    function getCellSize() {
+      if (!state) return 50;
+      const maxW = 860;
+      const maxH = 680;
+      const sizeX = Math.floor(maxW / state.scenario.width);
+      const sizeY = Math.floor(maxH / state.scenario.height);
+      return Math.max(34, Math.min(sizeX, sizeY, 68));
+    }
+
+    // ==============================================================================
+    // Real-Time Canvas Rendering Loop with Smooth Interpolation
+    // ==============================================================================
+
+    function renderLoop(now) {
+      if (state) {
+        if (animStartTime > 0) {
+          const elapsed = now - animStartTime;
+          const animDur = Math.min(tickSpeedMs * 0.75, 260);
+          animationProgress = Math.min(1.0, elapsed / animDur);
+        } else {
+          animationProgress = 1.0;
+        }
+        renderCanvas();
+      }
+      requestAnimationFrame(renderLoop);
+    }
+
+    function renderCanvas() {
+      const W = state.scenario.width;
+      const H = state.scenario.height;
+      const S = getCellSize();
+
+      if (canvas.width !== W * S || canvas.height !== H * S) {
+        canvas.width = W * S;
+        canvas.height = H * S;
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // 1. Grid Background & Cells
+      ctx.fillStyle = "#0c1322";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.strokeStyle = "#1e293b";
+      ctx.lineWidth = 1;
+      for (let x = 0; x <= W; x++) {
+        ctx.beginPath();
+        ctx.moveTo(x * S, 0);
+        ctx.lineTo(x * S, H * S);
+        ctx.stroke();
+      }
+      for (let y = 0; y <= H; y++) {
+        ctx.beginPath();
+        ctx.moveTo(0, y * S);
+        ctx.lineTo(W * S, y * S);
+        ctx.stroke();
+      }
+
+      // Coordinate Indices
+      ctx.fillStyle = "rgba(148, 163, 184, 0.4)";
+      ctx.font = "9px monospace";
+      for (let x = 0; x < W; x++) {
+        ctx.fillText(x, x * S + 4, 11);
+      }
+      for (let y = 1; y < H; y++) {
+        ctx.fillText(y, 4, y * S + 11);
+      }
+
+      // 2. Static Walls and Pillars
+      for (const w of state.walls) {
+        const wx = w.x * S;
+        const wy = w.y * S;
+        ctx.fillStyle = "#1e293b";
+        ctx.fillRect(wx + 2, wy + 2, S - 4, S - 4);
+        ctx.strokeStyle = "#334155";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(wx + 2, wy + 2, S - 4, S - 4);
+
+        // Diagonal hatch marks for structural solid look
+        ctx.strokeStyle = "#475569";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(wx + 4, wy + S - 4);
+        ctx.lineTo(wx + S - 4, wy + 4);
+        ctx.stroke();
+      }
+
+      // 3. Recharge Stations / Pads
+      for (const r of state.resources) {
+        const rx = r.x * S;
+        const ry = r.y * S;
+        const padInset = 6;
+
+        // Outer glow
+        const glowRad = r.active ? 16 : 8;
+        const grad = ctx.createRadialGradient(rx + S / 2, ry + S / 2, S / 4, rx + S / 2, ry + S / 2, S / 2 + glowRad);
+        grad.addColorStop(0, "rgba(16, 185, 129, 0.35)");
+        grad.addColorStop(1, "rgba(16, 185, 129, 0.0)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(rx - glowRad, ry - glowRad, S + glowRad * 2, S + glowRad * 2);
+
+        // Pad Surface
+        ctx.fillStyle = "#064e3b";
+        ctx.fillRect(rx + padInset, ry + padInset, S - padInset * 2, S - padInset * 2);
+        ctx.strokeStyle = "#10b981";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(rx + padInset, ry + padInset, S - padInset * 2, S - padInset * 2);
+
+        // Recharge Label
+        ctx.fillStyle = "#34d399";
+        ctx.font = "bold 11px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(`+${r.recharge_amount}`, rx + S / 2, ry + S / 2);
+      }
+
+      // 4. Overlays: Sensory Horizon (R <= 2.0)
+      if (chkVision.checked) {
+        for (const [aid, ag] of Object.entries(state.agents)) {
+          if (!ag.active) continue;
+          if (selectedAgentId && selectedAgentId !== aid) continue; // Focus on selected agent if any
+
+          const curX = ag.prev_x + (ag.x - ag.prev_x) * animationProgress;
+          const curY = ag.prev_y + (ag.y - ag.prev_y) * animationProgress;
+          const cx = (curX + 0.5) * S;
+          const cy = (curY + 0.5) * S;
+          const radiusPixels = 2.0 * S;
+
+          ctx.beginPath();
+          ctx.arc(cx, cy, radiusPixels, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(59, 130, 246, 0.07)";
+          ctx.fill();
+          ctx.strokeStyle = "rgba(59, 130, 246, 0.3)";
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      }
+
+      // 5. Overlays: Path Breadcrumb Trails
+      if (chkTrails.checked) {
+        for (const [aid, ag] of Object.entries(state.agents)) {
+          if (!ag.trail || ag.trail.length < 2) continue;
+          const agentIdx = Object.keys(state.agents).indexOf(aid);
+          const col = AGENT_COLORS[agentIdx % AGENT_COLORS.length];
+
+          ctx.strokeStyle = col;
+          ctx.lineWidth = 2;
+          ctx.globalAlpha = 0.45;
+          ctx.beginPath();
+          ag.trail.forEach((p, idx) => {
+            const px = (p.x + 0.5) * S;
+            const py = (p.y + 0.5) * S;
+            if (idx === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          });
+          ctx.stroke();
+          ctx.globalAlpha = 1.0;
+        }
+      }
+
+      // 6. Overlays: Target Flags and Connecting Lines
+      for (const [aid, ag] of Object.entries(state.agents)) {
+        if (!ag.target) continue;
+        const agentIdx = Object.keys(state.agents).indexOf(aid);
+        const col = AGENT_COLORS[agentIdx % AGENT_COLORS.length];
+        const tx = (ag.target.x + 0.5) * S;
+        const ty = (ag.target.y + 0.5) * S;
+
+        if (chkTargets.checked && ag.active) {
+          const curX = ag.prev_x + (ag.x - ag.prev_x) * animationProgress;
+          const curY = ag.prev_y + (ag.y - ag.prev_y) * animationProgress;
+          ctx.strokeStyle = col;
+          ctx.lineWidth = 1.2;
+          ctx.setLineDash([3, 5]);
+          ctx.beginPath();
+          ctx.moveTo((curX + 0.5) * S, (curY + 0.5) * S);
+          ctx.lineTo(tx, ty);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        // Diamond Target Glyph
+        const dSize = 10;
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.moveTo(tx, ty - dSize);
+        ctx.lineTo(tx + dSize, ty);
+        ctx.lineTo(tx, ty + dSize);
+        ctx.lineTo(tx - dSize, ty);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+
+      // 7. Dynamic Obstacles (Moving Hazard Obstacles)
+      for (const obs of state.dynamic_obstacles) {
+        const curX = obs.prev_x + (obs.x - obs.prev_x) * animationProgress;
+        const curY = obs.prev_y + (obs.y - obs.prev_y) * animationProgress;
+        const ox = (curX + 0.5) * S;
+        const oy = (curY + 0.5) * S;
+        const obsRadius = S * 0.38;
+
+        // Predicted Trajectory Vector
+        if (chkDynVectors.checked) {
+          const nx = (obs.next_x + 0.5) * S;
+          const ny = (obs.next_y + 0.5) * S;
+          ctx.strokeStyle = "#ea580c";
+          ctx.lineWidth = 2;
+          ctx.setLineDash([2, 2]);
+          ctx.beginPath();
+          ctx.moveTo(ox, oy);
+          ctx.lineTo(nx, ny);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        // Obstacle Token
+        ctx.fillStyle = "#ea580c";
+        ctx.beginPath();
+        ctx.roundRect(ox - obsRadius, oy - obsRadius, obsRadius * 2, obsRadius * 2, 6);
+        ctx.fill();
+        ctx.strokeStyle = "#fb923c";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Directional Indicator Chevron
+        if (obs.vx !== 0 || obs.vy !== 0) {
+          const arrowLen = obsRadius * 0.7;
+          ctx.strokeStyle = "#ffffff";
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(ox, oy);
+          ctx.lineTo(ox + obs.vx * arrowLen, oy + obs.vy * arrowLen);
+          ctx.stroke();
+        }
+      }
+
+      // 8. Overlays: Communication Links and Intent Vectors
+      if (chkComm.checked) {
+        for (const [aid, ag] of Object.entries(state.agents)) {
+          if (!ag.active || !ag.intent) continue;
+          const curX = ag.prev_x + (ag.x - ag.prev_x) * animationProgress;
+          const curY = ag.prev_y + (ag.y - ag.prev_y) * animationProgress;
+          const startX = (curX + 0.5) * S;
+          const startY = (curY + 0.5) * S;
+          const endX = (ag.intent.x + 0.5) * S;
+          const endY = (ag.intent.y + 0.5) * S;
+
+          // Intent Arrow
+          ctx.strokeStyle = "#06b6d4";
+          ctx.lineWidth = 2.5;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Intent Target Cell Ring
+          ctx.strokeStyle = "rgba(6, 182, 212, 0.7)";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(endX, endY, 6, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Peer-to-peer Communication Rays (within R <= 2.0)
+          for (const pid of ag.visible_peers) {
+            const peer = state.agents[pid];
+            if (!peer) continue;
+            const px = (peer.prev_x + (peer.x - peer.prev_x) * animationProgress + 0.5) * S;
+            const py = (peer.prev_y + (peer.y - peer.prev_y) * animationProgress + 0.5) * S;
+
+            ctx.strokeStyle = "rgba(6, 182, 212, 0.35)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(px, py);
+            ctx.stroke();
+          }
+        }
+      }
+
+      // 9. Overlays: Deadlocks and Conflict Markers
+      if (chkConflicts.checked && state.metrics.deadlock_locations) {
+        for (const dl of state.metrics.deadlock_locations) {
+          const dx = (dl.x + 0.5) * S;
+          const dy = (dl.y + 0.5) * S;
+          ctx.strokeStyle = "#ef4444";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(dx, dy, S * 0.45, 0, Math.PI * 2);
+          ctx.stroke();
+
+          ctx.fillStyle = "#ef4444";
+          ctx.font = "bold 10px sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("!", dx, dy);
+        }
+      }
+
+      // 10. Autonomous Agents
+      for (const [aid, ag] of Object.entries(state.agents)) {
+        const agentIdx = Object.keys(state.agents).indexOf(aid);
+        const col = AGENT_COLORS[agentIdx % AGENT_COLORS.length];
+
+        const curX = ag.prev_x + (ag.x - ag.prev_x) * animationProgress;
+        const curY = ag.prev_y + (ag.y - ag.prev_y) * animationProgress;
+        const ax = (curX + 0.5) * S;
+        const ay = (curY + 0.5) * S;
+        const radius = S * 0.34;
+
+        // Selected Halo
+        if (selectedAgentId === aid) {
+          ctx.strokeStyle = "#38bdf8";
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.arc(ax, ay, radius + 5, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        // Body Circle
+        ctx.fillStyle = ag.active ? col : (ag.status === "reached_target" ? "#059669" : "#475569");
+        ctx.beginPath();
+        ctx.arc(ax, ay, radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Outline Border
+        ctx.strokeStyle = ag.status === "reached_target" ? "#34d399" : (ag.action_success ? "#ffffff" : "#ef4444");
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Directional Heading Indicator
+        if (ag.active && ag.action) {
+          let dx = 0, dy = 0;
+          if (ag.action === "up") dy = -1;
+          else if (ag.action === "down") dy = 1;
+          else if (ag.action === "left") dx = -1;
+          else if (ag.action === "right") dx = 1;
+
+          if (dx !== 0 || dy !== 0) {
+            const hx = ax + dx * (radius * 0.85);
+            const hy = ay + dy * (radius * 0.85);
+            ctx.fillStyle = "#ffffff";
+            ctx.beginPath();
+            ctx.arc(hx, hy, 3.5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
+        // Energy Bar above agent
+        const barW = radius * 2;
+        const barH = 4;
+        const barX = ax - radius;
+        const barY = ay - radius - 7;
+        const eRatio = Math.max(0, Math.min(1, ag.energy / ag.max_energy));
+
+        ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+        ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
+        ctx.fillStyle = eRatio > 0.5 ? "#10b981" : (eRatio > 0.25 ? "#f59e0b" : "#ef4444");
+        ctx.fillRect(barX, barY, barW * eRatio, barH);
+
+        // Agent ID label below
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 9px monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(aid.replace("agent_", ""), ax, ay + radius + 8);
+      }
+    }
+
+    // Start
+    window.addEventListener("DOMContentLoaded", init);
+  </script>
+</body>
+</html>
