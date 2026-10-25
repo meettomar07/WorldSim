@@ -72,7 +72,11 @@ from .robust_policy import (
     RobustResourcePolicy,
     RouteComparison,
 )
-from .viewer import MultiAgentWorldViewer, WorldViewer
+try:
+    from .viewer import MultiAgentWorldViewer, WorldViewer
+except ImportError:
+    MultiAgentWorldViewer = None  # type: ignore
+    WorldViewer = None  # type: ignore
 from .web_viewer import LiveViewerServer, SimulationSession, launch_web_viewer
 
 __all__ = [
