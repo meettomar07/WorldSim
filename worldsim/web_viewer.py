@@ -31,6 +31,7 @@ import urllib.parse
 import webbrowser
 
 from worldsim.actions import Action
+from worldsim.cbs import CBSSolver, CBSPolicy, build_dynamic_obstacle_schedule
 from worldsim.config import WorldConfig
 from worldsim.coordination import MultiAgentCoordinator, agent_val
 from worldsim.decentralized_learning import (
@@ -430,6 +431,28 @@ class SimulationSession:
             "walls": [],
         }
 
+        # 4. Held-Out Generalization Test Scenarios (TEST_H01 - TEST_H06)
+        try:
+            from worldsim.scenario_registry import build_scenario_instance, get_scenario_descriptor
+            for h_id in ["TEST_H01", "TEST_H02", "TEST_H03", "TEST_H04", "TEST_H05", "TEST_H06"]:
+                h_desc = get_scenario_descriptor(h_id)
+                h_cfg, h_walls, h_fp = build_scenario_instance(h_id, env_seed=42)
+                registry[h_id] = {
+                    "id": h_id,
+                    "name": f"{h_id}: {h_desc.name}",
+                    "family": "Held-Out Test",
+                    "width": h_cfg.width,
+                    "height": h_cfg.height,
+                    "max_energy": h_cfg.max_energy,
+                    "agents": list(h_cfg.agents),
+                    "active_agent_ids": [a.id for a in h_cfg.agents if a.target is not None],
+                    "resources": list(h_cfg.resources),
+                    "dynamic_obstacles": list(h_cfg.dynamic_obstacles),
+                    "walls": list(h_walls),
+                }
+        except Exception:
+            pass
+
         return registry
 
     def get_available_scenarios(self) -> list[dict[str, Any]]:
@@ -476,6 +499,11 @@ class SimulationSession:
                 "id": "heuristic",
                 "name": "Decentralized Heuristic (RobustResourcePolicy)",
                 "description": "Rule-based local-horizon policy with cycle detection and energy-safe queuing.",
+            },
+            {
+                "id": "cbs",
+                "name": "Conflict-Based Search (CBS MAPF Solver)",
+                "description": "Sharon et al. MAPF baseline with Space-Time A* and constraint tree branching.",
             },
             {
                 "id": "centralized",
@@ -563,63 +591,78 @@ class SimulationSession:
         learned_no_comm_model = get_cached_learned_model(communication=False)
 
         self.policies = {}
-        for aid in self.active_agent_ids:
-            if policy_mode == "hybrid_comm":
-                self.policies[aid] = HybridCoordinationPolicy(
-                    world_width=self.width,
-                    world_height=self.height,
-                    max_energy=self.max_energy,
-                    sensory_radius=2.0,
-                    learner=learned_comm_model,
-                    base_learner=base_learner,
-                    enable_communication=True,
-                    coordinator=self.sim.coordinator,
+        if policy_mode == "cbs":
+            walls_set = {Position(w[0], w[1]) for w in self.wall_positions}
+            solver = CBSSolver(self.width, self.height, walls_set, max_time=60)
+            starts = {a.id: Position(a.initial_x, a.initial_y) for a in scen["agents"] if a.id in self.active_agent_ids}
+            goals = {a.id: a.target for a in scen["agents"] if a.id in self.active_agent_ids and a.target is not None}
+            dyn_sched = None
+            if scen.get("dynamic_obstacles"):
+                dyn_sched = build_dynamic_obstacle_schedule(
+                    scen["dynamic_obstacles"], self.width, self.height, walls_set, scen.get("resources", ()), max_time=60
                 )
-            elif policy_mode == "remediated_comm":
-                self.policies[aid] = LearnedCoordinationPolicy(
-                    world_width=self.width,
-                    world_height=self.height,
-                    max_energy=self.max_energy,
-                    sensory_radius=2.0,
-                    learner=learned_comm_model,
-                    enable_communication=True,
-                    coordinator=self.sim.coordinator,
-                    enable_safety_guard=True,
-                )
-            elif policy_mode == "learned_comm":
-                self.policies[aid] = LearnedCoordinationPolicy(
-                    world_width=self.width,
-                    world_height=self.height,
-                    max_energy=self.max_energy,
-                    sensory_radius=2.0,
-                    learner=learned_comm_model,
-                    enable_communication=True,
-                    coordinator=self.sim.coordinator,
-                    enable_safety_guard=False,
-                )
-            elif policy_mode == "learned_no_comm":
-                self.policies[aid] = LearnedCoordinationPolicy(
-                    world_width=self.width,
-                    world_height=self.height,
-                    max_energy=self.max_energy,
-                    sensory_radius=2.0,
-                    learner=learned_no_comm_model,
-                    enable_communication=False,
-                    coordinator=self.sim.coordinator,
-                    enable_safety_guard=False,
-                )
-            elif policy_mode == "heuristic" or policy_mode == "centralized":
-                pol = RobustResourcePolicy(
-                    world_width=self.width,
-                    world_height=self.height,
-                    max_energy=self.max_energy,
-                    sensory_radius=2.0,
-                    base_learner=base_learner,
-                    coordinator=self.sim.coordinator,
-                )
-                pol.coordinator = self.sim.coordinator
-                pol.utility_evaluator.coordinator = self.sim.coordinator
-                self.policies[aid] = pol
+            sol = solver.solve(starts, goals, dynamic_obstacles_schedule=dyn_sched)
+            for aid in self.active_agent_ids:
+                p = sol.paths.get(aid, []) if sol.success else []
+                self.policies[aid] = CBSPolicy(aid, p)
+        else:
+            for aid in self.active_agent_ids:
+                if policy_mode == "hybrid_comm":
+                    self.policies[aid] = HybridCoordinationPolicy(
+                        world_width=self.width,
+                        world_height=self.height,
+                        max_energy=self.max_energy,
+                        sensory_radius=2.0,
+                        learner=learned_comm_model,
+                        base_learner=base_learner,
+                        enable_communication=True,
+                        coordinator=self.sim.coordinator,
+                    )
+                elif policy_mode == "remediated_comm":
+                    self.policies[aid] = LearnedCoordinationPolicy(
+                        world_width=self.width,
+                        world_height=self.height,
+                        max_energy=self.max_energy,
+                        sensory_radius=2.0,
+                        learner=learned_comm_model,
+                        enable_communication=True,
+                        coordinator=self.sim.coordinator,
+                        enable_safety_guard=True,
+                    )
+                elif policy_mode == "learned_comm":
+                    self.policies[aid] = LearnedCoordinationPolicy(
+                        world_width=self.width,
+                        world_height=self.height,
+                        max_energy=self.max_energy,
+                        sensory_radius=2.0,
+                        learner=learned_comm_model,
+                        enable_communication=True,
+                        coordinator=self.sim.coordinator,
+                        enable_safety_guard=False,
+                    )
+                elif policy_mode == "learned_no_comm":
+                    self.policies[aid] = LearnedCoordinationPolicy(
+                        world_width=self.width,
+                        world_height=self.height,
+                        max_energy=self.max_energy,
+                        sensory_radius=2.0,
+                        learner=learned_no_comm_model,
+                        enable_communication=False,
+                        coordinator=self.sim.coordinator,
+                        enable_safety_guard=False,
+                    )
+                elif policy_mode == "heuristic" or policy_mode == "centralized":
+                    pol = RobustResourcePolicy(
+                        world_width=self.width,
+                        world_height=self.height,
+                        max_energy=self.max_energy,
+                        sensory_radius=2.0,
+                        base_learner=base_learner,
+                        coordinator=self.sim.coordinator,
+                    )
+                    pol.coordinator = self.sim.coordinator
+                    pol.utility_evaluator.coordinator = self.sim.coordinator
+                    self.policies[aid] = pol
 
         # Reset runtime telemetry
         self.step_count = 0

@@ -1,22 +1,22 @@
 # WorldSim
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg?style=flat-square)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/pytest-252%20passed-success.svg?style=flat-square)](file:///d:/SimWorld/tests)
+[![Tests](https://img.shields.io/badge/pytest-272%20passed-success.svg?style=flat-square)](file:///d:/SimWorld/tests)
 [![Architecture](https://img.shields.io/badge/Dependencies-Zero%20External-orange.svg?style=flat-square)](file:///d:/SimWorld/worldsim)
 [![Viewer](https://img.shields.io/badge/Live%20Viewer-HTML5%20Canvas%202D-green.svg?style=flat-square)](file:///d:/SimWorld/run_viewer.py)
 [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg?style=flat-square)](LICENSE)
 
-**WorldSim** is an open-source, deterministic multi-agent simulation and decentralized reinforcement learning research platform. It investigates how autonomous agents coordinate, navigate tight bottlenecks, budget constrained energy, and avoid dynamic hazards under **strict partial observability ($R \le 2.0$)** with short-range communicative intent.
+**WorldSim** is an open-source, deterministic multi-agent simulation, multi-agent pathfinding (MAPF), and decentralized reinforcement learning research platform. It investigates how autonomous agents coordinate, navigate tight bottlenecks, budget constrained energy, and avoid dynamic hazards under **strict partial observability ($R \le 2.0$)** with short-range communicative intent.
 
-Built with **zero third-party runtime dependencies** using the Python Standard Library, WorldSim features a real-time, interactive 2D web viewer (HTML5 Canvas) and a comprehensive benchmark suite evaluated across multi-seed generalization topologies.
+Built with **zero third-party runtime dependencies** using the Python Standard Library, WorldSim features a real-time, interactive 2D web viewer (HTML5 Canvas), formal train/validation/test scenario isolation, a standard **Conflict-Based Search (CBS)** MAPF baseline, and a rigorous statistical benchmark reporting Wilson score confidence intervals across procedurally generated held-out environments.
 
 ---
 
 ## Table of Contents
 
 - [Overview & Key Features](#overview--key-features)
+- [Held-Out Generalization & MAPF Baselines](#held-out-generalization--mapf-baselines)
 - [Live 2D Interactive Web Viewer](#live-2d-interactive-web-viewer)
-- [Empirical Multi-Seed Generalization Benchmark](#empirical-multi-seed-generalization-benchmark)
 - [System Architecture & Physics Engine](#system-architecture--physics-engine)
 - [Coordination Policies](#coordination-policies)
 - [Repository Organization](#repository-organization)
@@ -28,12 +28,48 @@ Built with **zero third-party runtime dependencies** using the Python Standard L
 
 ## Overview & Key Features
 
-* **Bit-for-Bit Determinism:** Movement resolution, collision handling, dynamic obstacle trajectories, and resource allocation are fully deterministic and reproducible across seeds.
+* **Bit-for-Bit Determinism & Fingerprinting:** Movement resolution, collision handling, dynamic obstacle trajectories, and resource allocation are fully deterministic. Environments are fingerprinted with canonical SHA-256 hashes to guarantee genuine topological variation across seeds.
+* **Strict Scenario Isolation (`Split.TEST`):** Genuinely held-out test scenarios are procedurally generated and isolated from training and hyperparameter tuning by hardcoded registry guards.
+* **Conflict-Based Search (CBS) Baseline:** A zero-dependency Sharon et al. (2012/2015) MAPF solver featuring low-level Space-Time A*, high-level constraint tree branching, and dynamic obstacle scheduling.
 * **Strict Partial Observability:** Agents make decisions using local observations within a localized Euclidean radius ($R \le 2.0$). Global maps and distant agent plans are invisible.
 * **Decentralized Learning & Communicative Intent:** Peer agents exchange short-range intention vectors within sensory range ($R \le 2.0$) to negotiate bottlenecks and prevent collision deadlocks.
 * **Dynamic Moving Hazards:** Moving obstacles with velocity vectors and predictive bounce dynamics navigate the grid; agents anticipate trajectories and replan dynamically.
 * **Energy Economics & Recharging:** Agents must manage finite battery budgets, evaluate recharge station utilities, and navigate without suffering terminal exhaustion.
-* **Zero Runtime Dependencies:** The simulation engine, reinforcement learning agents, and web viewer run on vanilla Python (`http.server`, `math`, `heapq`, `dataclasses`, `json`).
+* **Statistical Rigor:** All binomial completion metrics feature exact Wilson score 95% confidence intervals, and step statistics are conditioned on successful episodes without hardcoded values.
+* **Zero Runtime Dependencies:** The simulation engine, reinforcement learning agents, CBS solver, and web viewer run on vanilla Python (`http.server`, `math`, `heapq`, `dataclasses`, `json`, `hashlib`).
+
+---
+
+## Held-Out Generalization & MAPF Baselines
+
+WorldSim implements a formal scenario split (`Split.TRAIN`, `Split.VAL`, `Split.TEST`). The held-out benchmark evaluates policies on 6 structurally novel procedural environments across 10 evaluation seeds (360 total episodes):
+
+| Scenario ID | Name | Topology & Dynamic Features |
+|---|---|---|
+| `TEST_H01` | **Asymmetric Funnel Bottleneck** | Wide chamber funnels into constriction corridor ($W \in \{1, 2\}$) |
+| `TEST_H02` | **Double-Chamber Doorway Swap** | Two rooms connected by a single doorway with asymmetric starting energies |
+| `TEST_H03` | **Procedural Connected Maze** | Randomized obstacle fields with BFS-verified 4-corner reachability |
+| `TEST_H04` | **Dynamic Hazard Highway** | Crossing two randomized counter-flowing patrol lanes |
+| `TEST_H05` | **Three-Way T-Junction** | 3 agents converging simultaneously at an orthogonal 1-cell junction |
+| `TEST_H06` | **Critical Recharge Alcove Chokepoint** | Energy budget requires dead-end alcove recharge detour to reach target |
+
+Full empirical findings, confidence intervals, and raw records are in [`reports/HELD_OUT_BENCHMARK_REPORT.md`](file:///d:/SimWorld/reports/HELD_OUT_BENCHMARK_REPORT.md) and [`benchmarks/held_out_generalization_results.json`](file:///d:/SimWorld/benchmarks/held_out_generalization_results.json).
+
+### Overall Held-Out Benchmark Results (10 Seeds per Scenario, 360 Episodes)
+
+| Policy | Information Boundary | Overall Completion (95% CI) | Agent Success | Exhaustions | Timeouts | Mean Runtime |
+|---|---|:---:|:---:|:---:|:---:|:---:|
+| **`hybrid_comm`** | Local Horizon ($R \le 2.0$) + Safety Guard | **98.3%** [91.1%, 99.7%] | **98.4%** | 1 | 0 | 7.2ms |
+| **`cbs`** (MAPF) | Offline Space-Time A* + Constraint Tree | **83.3%** [72.0%, 90.7%] | 89.5% | 10 | 0 | 37.1ms |
+| **`centralized`** | Omniscient Centralized Arbiter | **80.0%** [68.2%, 88.2%] | 86.8% | 0 | 12 | 15.4ms |
+| **`heuristic`** | Robust BFS Graph Search | **80.0%** [68.2%, 88.2%] | 86.8% | 0 | 12 | 15.3ms |
+| **`learned_comm`** | Decentralized Q-Learner + Intent Vectors | **70.0%** [57.5%, 80.1%] | 84.2% | 18 | 0 | 5.8ms |
+| **`learned_no_comm`** | Decentralized Q-Learner (No Comm) | **16.7%** [9.3%, 28.0%] | 29.5% | 5 | 45 | 23.2ms |
+
+### Key Scientific Insights
+1. **Classical MAPF vs. Energy Constraints:** Standard CBS excels at geometric collision avoidance (100% on `TEST_H01`–`TEST_H05`), but fails on `TEST_H06` (0% completion, 10/10 exhaustions). Because classical MAPF assumes unconstrained energy, CBS selects the direct 7-step path without detouring to the recharge alcove. WorldSim's `hybrid_comm` recognizes battery exhaustion risk and achieves 100% completion by queuing at the recharge alcove.
+2. **Doorway Swap Deadlocks:** In tight single-doorway swaps (`TEST_H02`), greedy heuristic and centralized arbiters suffer reciprocal blocking (0% completion). CBS (100%) and `learned_comm` / `hybrid_comm` (100%) successfully coordinate sidesteps and intent yielding.
+3. **The Essential Role of Communication:** In narrow bottlenecks and dynamic highways, removing communicative intent (`learned_no_comm`) collapses performance to 16.7% due to endless step timeouts and head-on collisions.
 
 ---
 
@@ -135,6 +171,7 @@ flowchart LR
 | Policy | Description | Information Boundary | Strengths |
 | :--- | :--- | :---: | :--- |
 | **`hybrid_comm`** *(Default)* | Learned Q-policy with safe recharge/detour arbitration and local intent communication | Local Horizon ($R \le 2.0$) | High safety, zero collisions, balances learned speed with safety guards. |
+| **`cbs`** *(MAPF Baseline)* | Conflict-Based Search (Sharon et al. 2012) with Space-Time A* and constraint tree | Global Static Map + Dynamic Schedule | Optimal offline trajectories on static graphs; zero collisions. |
 | **`learned_comm`** | Pure decentralized Q-learner using local peer intent vectors | Local Horizon ($R \le 2.0$) | Fast learned execution; excels at dynamic obstacle evasion and corridor swaps. |
 | **`learned_no_comm`** | Non-communicative decentralized Q-learner | Local Sensory Only | Experimental control baseline measuring the empirical value of communication. |
 | **`heuristic`** | Rule-based `RobustResourcePolicy` with BFS corridor routing and obstacle memory TTL | Local Sensory Only | Deterministic graph search; excels at complex multi-step energy routing. |
@@ -150,36 +187,39 @@ The repository is structured into modular packages, isolating experiments, bench
 SimWorld/
 ├── worldsim/                 # Core Python simulation engine (Zero External Dependencies)
 │   ├── actions.py            # Movement and recharge action definitions
+│   ├── cbs.py                # Conflict-Based Search (CBS) MAPF solver & Space-Time A*
 │   ├── config.py             # World and simulation configurations
 │   ├── coordination.py       # Multi-agent arbitration, deadlock detection & priority rules
 │   ├── decentralized_learning.py # Q-learning models, feature extractors & hybrid policy
 │   ├── dynamic_obstacles.py  # Moving hazard physics & trajectory prediction
 │   ├── energy.py             # Energy management & recharge validation
+│   ├── fingerprint.py        # Cryptographic SHA-256 canonical environment fingerprinting
 │   ├── models.py             # Immutable Position, Resource, and Observation models
 │   ├── multi_agent.py        # Simultaneous 5-phase simulation engine
 │   ├── robust_policy.py      # BFS path planning, obstacle memory TTL & cycle breaker
+│   ├── scenario_generator.py # Procedural held-out environment generator across 6 families
+│   ├── scenario_registry.py  # Train / Validation / Test split isolation registry
+│   ├── statistics.py         # Wilson score 95% CIs & continuous metric aggregations
 │   ├── web_viewer.py         # Authoritative REST API & LiveViewerServer
 │   └── static/
 │       └── index.html        # High-DPI HTML5 Canvas live visualization SPA
 │
 ├── experiments/              # Evaluation harnesses & benchmark runners
+│   ├── eval_heldout.py       # Genuinely held-out test evaluation runner (Split.TEST)
 │   ├── eval_generalization.py# Multi-seed empirical generalization benchmark
-│   ├── phase13_5_unseen_audit.py
-│   ├── phase14_2_local_horizon_eval.py
-│   ├── phase14_3_dynamic_obstacle_eval.py
-│   └── phase14_4_learned_coordination_eval.py
+│   └── ...
 │
 ├── benchmarks/               # Machine-readable JSON evaluation datasets & model weights
+│   ├── held_out_generalization_results.json # Raw 360-episode records & statistical summaries
 │   ├── multi_seed_generalization_results.json
-│   ├── phase14_4_weights_comm.json
 │   └── ...
 │
 ├── reports/                  # Markdown audit and verification reports
+│   ├── HELD_OUT_BENCHMARK_REPORT.md # Formal held-out test split & CBS baseline report
 │   ├── GENERALIZATION_STRESS_REPORT.md
-│   ├── PHASE15_VERIFICATION_REPORT.md
 │   └── ...
 │
-├── tests/                    # Comprehensive automated test suite (252 unit & integration tests)
+├── tests/                    # Comprehensive automated test suite (272 unit & integration tests)
 ├── docs/                     # Documentation archive & historical research audits
 │   └── RESEARCH_HISTORY.md   # Chronological research logs (Phases 1 through 15)
 │
@@ -195,7 +235,7 @@ SimWorld/
 
 ### Prerequisites
 * **Python 3.10+** (Python 3.10, 3.11, 3.12, 3.13 tested).
-* No external libraries required to run the simulation or live viewer.
+* No external libraries required to run the simulation, CBS solver, or live viewer.
 
 ### 1. Launch the Live 2D Web Viewer
 ```bash
@@ -204,14 +244,20 @@ python run_viewer.py
 Open **[http://localhost:8000](http://localhost:8000)** in your browser.
 
 ### 2. Run the Full Test Suite
-Execute all 252 automated unit and integration tests:
+Execute all 272 automated unit and integration tests:
 ```bash
 python -m pytest
 ```
-*Expected output: `252 passed in ~10s`.*
+*Expected output: `272 passed in ~10s`.*
 
-### 3. Run the Multi-Seed Generalization Benchmark
-Reproduce the multi-seed empirical comparison across 6 scenarios, 5 policies, and 20 seeds:
+### 3. Run the Held-Out Generalization & MAPF Benchmark
+Execute the complete held-out evaluation across 6 novel scenarios, 6 policies, and 10 evaluation seeds (360 episodes) with Wilson confidence intervals:
+```bash
+python -m experiments.eval_heldout --seeds 10
+```
+
+### 4. Run the Validation Benchmark
+Reproduce the multi-seed empirical comparison across validation scenarios:
 ```bash
 python -m experiments.eval_generalization
 ```
