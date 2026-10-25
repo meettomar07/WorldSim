@@ -191,11 +191,13 @@ def generate_heldout_scenario(
                 if not is_corridor:
                     walls.add(Position(x, y))
 
-        dist_offset = rng.randint(0, 1)
+        start_w = rng.randint(0, 1)
+        start_e = 6 - rng.randint(0, 1)
+        start_n = rng.randint(0, 1)
         agents = [
-            AgentConfig(id="agent_west", initial_x=0, initial_y=cy, initial_energy=10, target=Position(6, cy)),
-            AgentConfig(id="agent_east", initial_x=6, initial_y=cy, initial_energy=10, target=Position(cx, 0)),
-            AgentConfig(id="agent_north", initial_x=cx, initial_y=dist_offset, initial_energy=10, target=Position(0, cy)),
+            AgentConfig(id="agent_west", initial_x=start_w, initial_y=cy, initial_energy=10, target=Position(6, cy)),
+            AgentConfig(id="agent_east", initial_x=start_e, initial_y=cy, initial_energy=10, target=Position(cx, 0)),
+            AgentConfig(id="agent_north", initial_x=cx, initial_y=start_n, initial_energy=10, target=Position(0, cy)),
         ]
         resources = []
         dyn_obstacles = []
@@ -204,7 +206,7 @@ def generate_heldout_scenario(
     else:  # H06_CRITICAL_RECHARGE_CHOKE
         # Single recharge pad inside a dead-end alcove
         width, height = 8, 4
-        alcove_x = 3 + rng.randint(0, 1)
+        alcove_x = 3 + rng.randint(0, 1)  # Symmetrical central alcove column (3 or 4)
         alcove_y = 0
 
         walls = set()
@@ -213,11 +215,21 @@ def generate_heldout_scenario(
             if x != alcove_x:
                 walls.add(Position(x, 1))
 
-        # Initial energy is critical: 7 steps direct to goal, initial energy only 6!
-        # Recharging at alcove (5-6 steps away) is mandatory for both agents
+        # Start positions with variable offsets
+        x_l = rng.randint(0, 1)
+        x_r = 7 - rng.randint(0, 1)
+        d_direct_l = abs(x_l - 7)
+        d_direct_r = abs(x_r - 0)
+        d_alcove_l = abs(x_l - alcove_x) + 2
+        d_alcove_r = abs(x_r - alcove_x) + 2
+
+        # Initial energy guarantees reachability to alcove but requires recharge for goal
+        e_l = min(d_direct_l - 1, d_alcove_l + rng.randint(0, 1))
+        e_r = min(d_direct_r - 1, d_alcove_r + rng.randint(0, 1))
+
         agents = [
-            AgentConfig(id="agent_left", initial_x=0, initial_y=2, initial_energy=6, target=Position(7, 2)),
-            AgentConfig(id="agent_right", initial_x=7, initial_y=2, initial_energy=6, target=Position(0, 2)),
+            AgentConfig(id="agent_left", initial_x=x_l, initial_y=2, initial_energy=e_l, target=Position(7, 2)),
+            AgentConfig(id="agent_right", initial_x=x_r, initial_y=2, initial_energy=e_r, target=Position(0, 2)),
         ]
         resources = [Resource(Position(alcove_x, alcove_y), recharge_amount=8, consumable=False)]
         dyn_obstacles = []
