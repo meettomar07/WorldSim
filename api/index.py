@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from http.server import BaseHTTPRequestHandler
 import json
+import os
 from pathlib import Path
 import sys
 import traceback
@@ -14,16 +15,19 @@ root_dir = Path(__file__).resolve().parent.parent
 if str(root_dir) not in sys.path:
     sys.path.insert(0, str(root_dir))
 
-from worldsim.web_viewer import SimulationSession
+_SHARED_SESSION = None
 
-# Shared in-memory simulation session
-_SHARED_SESSION = SimulationSession(default_scenario="D01", default_policy="hybrid_comm", default_seed=42)
+
+def get_session():
+    global _SHARED_SESSION
+    if _SHARED_SESSION is None:
+        from worldsim.web_viewer import SimulationSession
+        _SHARED_SESSION = SimulationSession(default_scenario="D01", default_policy="heuristic", default_seed=42)
+    return _SHARED_SESSION
 
 
 class handler(BaseHTTPRequestHandler):
     """Vercel Serverless Python request handler."""
-
-    session = _SHARED_SESSION
 
     def log_message(self, format: str, *args: object) -> None:
         pass
@@ -51,29 +55,51 @@ class handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         try:
             path = self._get_target_path()
+
+            # Lightweight probe endpoint
+            if path == "/api/test":
+                data = json.dumps({
+                    "status": "ok",
+                    "python": sys.version,
+                    "cwd": os.getcwd(),
+                    "root_dir": str(root_dir),
+                }).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self._send_cors()
+                self.end_headers()
+                self.wfile.write(data)
+                return
+
             if path in {"/", "/index.html"}:
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self._send_cors()
                 self.end_headers()
                 html_path = root_dir / "worldsim" / "static" / "index.html"
+                if not html_path.exists():
+                    html_path = root_dir / "public" / "index.html"
                 self.wfile.write(html_path.read_bytes())
-            elif path == "/api/state":
-                data = json.dumps(self.session.get_snapshot()).encode("utf-8")
+                return
+
+            session = get_session()
+
+            if path == "/api/state":
+                data = json.dumps(session.get_snapshot()).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self._send_cors()
                 self.end_headers()
                 self.wfile.write(data)
             elif path == "/api/scenarios":
-                data = json.dumps(self.session.get_available_scenarios()).encode("utf-8")
+                data = json.dumps(session.get_available_scenarios()).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self._send_cors()
                 self.end_headers()
                 self.wfile.write(data)
             elif path == "/api/policies":
-                data = json.dumps(self.session.get_available_policies()).encode("utf-8")
+                data = json.dumps(session.get_available_policies()).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self._send_cors()
@@ -82,8 +108,8 @@ class handler(BaseHTTPRequestHandler):
             elif path == "/api/health":
                 data = json.dumps({
                     "status": "ok",
-                    "tick": self.session.step_count,
-                    "scenario": self.session.scenario_id,
+                    "tick": session.step_count,
+                    "scenario": session.scenario_id,
                 }).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
@@ -101,7 +127,11 @@ class handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(json.dumps({"error": "not_found", "path": path, "raw": self.path}).encode("utf-8"))
         except Exception as e:
-            err_data = json.dumps({"error": str(e), "traceback": traceback.format_exc()}).encode("utf-8")
+            err_data = json.dumps({
+                "error": str(e),
+                "type": type(e).__name__,
+                "traceback": traceback.format_exc(),
+            }).encode("utf-8")
             self.send_response(500)
             self.send_header("Content-Type", "application/json")
             self._send_cors()
@@ -118,15 +148,17 @@ class handler(BaseHTTPRequestHandler):
             except Exception:
                 payload = {}
 
+            session = get_session()
+
             if path == "/api/step":
-                data = json.dumps(self.session.step()).encode("utf-8")
+                data = json.dumps(session.step()).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self._send_cors()
                 self.end_headers()
                 self.wfile.write(data)
             elif path == "/api/reset":
-                data = json.dumps(self.session.reset()).encode("utf-8")
+                data = json.dumps(session.reset()).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self._send_cors()
@@ -134,9 +166,9 @@ class handler(BaseHTTPRequestHandler):
                 self.wfile.write(data)
             elif path == "/api/select":
                 scen_id = payload.get("scenario", "D01")
-                pol = payload.get("policy", "hybrid_comm")
+                pol = payload.get("policy", "heuristic")
                 seed = int(payload.get("seed", 42))
-                data = json.dumps(self.session.load_scenario(scen_id, seed, pol)).encode("utf-8")
+                data = json.dumps(session.load_scenario(scen_id, seed, pol)).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self._send_cors()
@@ -146,7 +178,11 @@ class handler(BaseHTTPRequestHandler):
                 self.send_response(404)
                 self.end_headers()
         except Exception as e:
-            err_data = json.dumps({"error": str(e), "traceback": traceback.format_exc()}).encode("utf-8")
+            err_data = json.dumps({
+                "error": str(e),
+                "type": type(e).__name__,
+                "traceback": traceback.format_exc(),
+            }).encode("utf-8")
             self.send_response(500)
             self.send_header("Content-Type", "application/json")
             self._send_cors()
