@@ -353,3 +353,63 @@ def test_event_log_bounds_and_rapid_stepping():
     assert len(snap["recent_events"]) <= 60
 
 
+def test_held_out_scenarios_available_in_viewer():
+    """Verify TEST_H01 through TEST_H06 are cataloged and selectable in SimulationSession."""
+    session = SimulationSession()
+    scenarios = session.get_available_scenarios()
+    scen_ids = [s["id"] for s in scenarios]
+    for h_id in ["TEST_H01", "TEST_H02", "TEST_H03", "TEST_H04", "TEST_H05", "TEST_H06"]:
+        assert h_id in scen_ids, f"{h_id} must be in available scenarios"
+
+    snap_h01 = session.load_scenario("TEST_H01", seed=42)
+    assert snap_h01["scenario"]["id"] == "TEST_H01"
+    assert len(snap_h01["agents"]) == 4
+
+
+def test_vercel_handler_scenario_and_policy_selection():
+    """Verify Vercel serverless handler correctly selects scenarios and policies without reverting to D01."""
+    import io
+    from api.index import handler
+
+    def make_mock_handler(method: str, path: str, payload_dict: dict | None = None, headers: dict | None = None):
+        h = handler.__new__(handler)
+        body = json.dumps(payload_dict).encode("utf-8") if payload_dict is not None else b""
+        h.rfile = io.BytesIO(body)
+        h.wfile = io.BytesIO()
+        h.command = method
+        h.path = path
+        h.requestline = f"{method} {path} HTTP/1.1"
+        h.request_version = "HTTP/1.1"
+        hdrs = {"Content-Length": str(len(body)), "Content-Type": "application/json"}
+        if headers:
+            hdrs.update(headers)
+        h.headers = hdrs
+        h.send_response = lambda code, msg=None: None
+        h.send_header = lambda k, v: None
+        h.end_headers = lambda: None
+        return h
+
+    # 1. Test POST /api/select with scenario_id and policy_mode (as sent by browser UI)
+    h_select = make_mock_handler("POST", "/api/select", {"scenario_id": "U06", "policy_mode": "hybrid_comm", "seed": 42})
+    h_select.do_POST()
+    resp_select = json.loads(h_select.wfile.getvalue().decode())
+    assert resp_select["scenario"]["id"] == "U06", f"Expected U06, got {resp_select['scenario']['id']}"
+    assert resp_select["scenario"]["policy_mode"] == "hybrid_comm"
+
+    # 2. Test GET /api/state with query param synchronization
+    h_state = make_mock_handler("GET", "/api/state?scenario=U14&policy=heuristic&seed=100")
+    h_state.do_GET()
+    resp_state = json.loads(h_state.wfile.getvalue().decode())
+    assert resp_state["scenario"]["id"] == "U14", f"Expected U14, got {resp_state['scenario']['id']}"
+    assert resp_state["scenario"]["policy_mode"] == "heuristic"
+    assert resp_state["scenario"]["seed"] == 100
+
+    # 3. Test POST /api/step with context payload
+    h_step = make_mock_handler("POST", "/api/step", {"scenario_id": "U14", "policy_mode": "heuristic", "seed": 100})
+    h_step.do_POST()
+    resp_step = json.loads(h_step.wfile.getvalue().decode())
+    assert resp_step["scenario"]["id"] == "U14"
+    assert resp_step["tick"] >= 1
+
+
+

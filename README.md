@@ -1,7 +1,7 @@
 # WorldSim
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg?style=flat-square)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/pytest-279%20passed-success.svg?style=flat-square)](tests/)
+[![Tests](https://img.shields.io/badge/pytest-281%20passed-success.svg?style=flat-square)](tests/)
 [![Architecture](https://img.shields.io/badge/Dependencies-Zero%20External-orange.svg?style=flat-square)](worldsim/)
 [![Viewer](https://img.shields.io/badge/Live%20Viewer-HTML5%20Canvas%202D-green.svg?style=flat-square)](run_viewer.py)
 [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg?style=flat-square)](LICENSE)
@@ -219,7 +219,7 @@ SimWorld/
 │   ├── GENERALIZATION_STRESS_REPORT.md
 │   └── ...
 │
-├── tests/                    # Comprehensive automated test suite (279 unit & integration tests)
+├── tests/                    # Comprehensive automated test suite (281 unit & integration tests)
 ├── docs/                     # Documentation archive & historical research audits
 │   └── RESEARCH_HISTORY.md   # Chronological research logs (Phases 1 through 15)
 │
@@ -244,11 +244,11 @@ python run_viewer.py
 Open **[http://localhost:8000](http://localhost:8000)** in your browser.
 
 ### 2. Run the Full Test Suite
-Execute all 279 automated unit and integration tests:
+Execute all 281 automated unit and integration tests:
 ```bash
 python -m pytest
 ```
-*Expected output: `279 passed in ~10s`.*
+*Expected output: `281 passed in ~10s`.*
 
 ### 3. Run the Held-Out Generalization & MAPF Benchmark
 Execute the complete held-out evaluation across 6 novel scenarios, 6 policies, and 10 evaluation seeds (360 episodes) with Wilson confidence intervals:

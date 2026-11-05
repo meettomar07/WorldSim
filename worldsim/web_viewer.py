@@ -439,7 +439,7 @@ class SimulationSession:
                 h_cfg, h_walls, h_fp = build_scenario_instance(h_id, env_seed=42)
                 registry[h_id] = {
                     "id": h_id,
-                    "name": f"{h_id}: {h_desc.name}",
+                    "name": f"{h_id}: {h_desc.scenario_name}",
                     "family": "Held-Out Test",
                     "width": h_cfg.width,
                     "height": h_cfg.height,
@@ -519,6 +519,27 @@ class SimulationSession:
         policy_mode: str = "hybrid_comm",
     ) -> dict[str, Any]:
         """Load and initialize a simulation scenario."""
+        if scenario_id.startswith("TEST_H"):
+            try:
+                from worldsim.scenario_registry import build_scenario_instance, get_scenario_descriptor
+                h_desc = get_scenario_descriptor(scenario_id)
+                h_cfg, h_walls, h_fp = build_scenario_instance(scenario_id, env_seed=seed)
+                self._scenario_registry[scenario_id] = {
+                    "id": scenario_id,
+                    "name": f"{scenario_id}: {h_desc.scenario_name}",
+                    "family": "Held-Out Test",
+                    "width": h_cfg.width,
+                    "height": h_cfg.height,
+                    "max_energy": h_cfg.max_energy,
+                    "agents": list(h_cfg.agents),
+                    "active_agent_ids": [a.id for a in h_cfg.agents if a.target is not None],
+                    "resources": list(h_cfg.resources),
+                    "dynamic_obstacles": list(h_cfg.dynamic_obstacles),
+                    "walls": list(h_walls),
+                }
+            except Exception:
+                pass
+
         if scenario_id not in self._scenario_registry:
             scenario_id = "D01"
         scen = self._scenario_registry[scenario_id]
@@ -1092,9 +1113,17 @@ class SimulationHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(data)
 
         elif path == "/api/select":
-            scenario_id = payload.get("scenario_id", self.session.scenario_id)
+            scenario_id = (
+                payload.get("scenario_id")
+                or payload.get("scenario")
+                or self.session.scenario_id
+            )
             seed = int(payload.get("seed", self.session.seed))
-            policy_mode = payload.get("policy_mode", self.session.policy_mode)
+            policy_mode = (
+                payload.get("policy_mode")
+                or payload.get("policy")
+                or self.session.policy_mode
+            )
             snapshot = self.session.load_scenario(scenario_id, seed, policy_mode)
             data = json.dumps(snapshot).encode("utf-8")
             self.send_response(200)

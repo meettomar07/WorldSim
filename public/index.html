@@ -804,6 +804,9 @@
     btnStep.addEventListener("click", () => { pause(); doStep(); });
     btnReset.addEventListener("click", () => { pause(); doReset(); });
     btnApplyConfig.addEventListener("click", () => { pause(); doApplyConfig(); });
+    scenarioSelect.addEventListener("change", () => { pause(); doApplyConfig(); });
+    policySelect.addEventListener("change", () => { pause(); doApplyConfig(); });
+    seedInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { pause(); doApplyConfig(); } });
 
     // Keyboard Shortcuts
     window.addEventListener("keydown", (e) => {
@@ -850,10 +853,30 @@
       }
     });
 
+    function getContextHeaders() {
+      return {
+        "Content-Type": "application/json",
+        "x-scenario-id": scenarioSelect ? scenarioSelect.value : "D01",
+        "x-policy-mode": policySelect ? policySelect.value : "hybrid_comm",
+        "x-seed": seedInput ? seedInput.value : "42"
+      };
+    }
+
     // Initialize API Data
     async function init() {
       await loadOptions();
-      await fetchState();
+      const params = new URLSearchParams(window.location.search);
+      const urlScen = params.get("scenario") || params.get("scenario_id");
+      const urlPol = params.get("policy") || params.get("policy_mode");
+      const urlSeed = params.get("seed");
+      if (urlScen && scenarioSelect) scenarioSelect.value = urlScen;
+      if (urlPol && policySelect) policySelect.value = urlPol;
+      if (urlSeed && seedInput) seedInput.value = urlSeed;
+      if (urlScen || urlPol || urlSeed) {
+        await doApplyConfig();
+      } else {
+        await fetchState();
+      }
       requestAnimationFrame(renderLoop);
     }
 
@@ -880,7 +903,13 @@
 
     async function fetchState() {
       try {
-        const res = await fetch("/api/state");
+        const scen = scenarioSelect ? scenarioSelect.value : "";
+        const pol = policySelect ? policySelect.value : "";
+        const seed = seedInput ? seedInput.value : "";
+        const qs = scen ? `?scenario=${encodeURIComponent(scen)}&policy=${encodeURIComponent(pol)}&seed=${encodeURIComponent(seed)}` : "";
+        const res = await fetch("/api/state" + qs, {
+          headers: getContextHeaders()
+        });
         const data = await res.json();
         updateState(data);
       } catch (err) {
@@ -890,7 +919,18 @@
 
     async function doStep() {
       try {
-        const res = await fetch("/api/step", { method: "POST" });
+        const payload = {
+          scenario_id: scenarioSelect.value,
+          scenario: scenarioSelect.value,
+          policy_mode: policySelect.value,
+          policy: policySelect.value,
+          seed: parseInt(seedInput.value, 10)
+        };
+        const res = await fetch("/api/step", {
+          method: "POST",
+          headers: getContextHeaders(),
+          body: JSON.stringify(payload)
+        });
         const data = await res.json();
         animStartTime = performance.now();
         animationProgress = 0.0;
@@ -905,7 +945,18 @@
 
     async function doReset() {
       try {
-        const res = await fetch("/api/reset", { method: "POST" });
+        const payload = {
+          scenario_id: scenarioSelect.value,
+          scenario: scenarioSelect.value,
+          policy_mode: policySelect.value,
+          policy: policySelect.value,
+          seed: parseInt(seedInput.value, 10)
+        };
+        const res = await fetch("/api/reset", {
+          method: "POST",
+          headers: getContextHeaders(),
+          body: JSON.stringify(payload)
+        });
         const data = await res.json();
         animStartTime = performance.now();
         animationProgress = 1.0;
@@ -918,19 +969,28 @@
     async function doApplyConfig() {
       const payload = {
         scenario_id: scenarioSelect.value,
+        scenario: scenarioSelect.value,
         policy_mode: policySelect.value,
+        policy: policySelect.value,
         seed: parseInt(seedInput.value, 10)
       };
       try {
         const res = await fetch("/api/select", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getContextHeaders(),
           body: JSON.stringify(payload)
         });
         const data = await res.json();
         animStartTime = performance.now();
         animationProgress = 1.0;
         updateState(data);
+        if (window.history && window.history.replaceState) {
+          const u = new URL(window.location.href);
+          u.searchParams.set("scenario", scenarioSelect.value);
+          u.searchParams.set("policy", policySelect.value);
+          u.searchParams.set("seed", seedInput.value);
+          window.history.replaceState({}, "", u.toString());
+        }
       } catch (err) {
         console.error("Failed to apply config", err);
       }
