@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import sys
 import traceback
+from typing import Any
 import urllib.parse
 
 # Ensure repository root is on sys.path
@@ -16,14 +17,62 @@ if str(root_dir) not in sys.path:
     sys.path.insert(0, str(root_dir))
 
 _SHARED_SESSION = None
+_TMP_CONFIG_FILE = Path("/tmp/worldsim_session_config.json")
+
+
+def _save_session_config(scenario_id: str, policy_mode: str, seed: int) -> None:
+    try:
+        _TMP_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _TMP_CONFIG_FILE.write_text(
+            json.dumps({"scenario": scenario_id, "policy": policy_mode, "seed": seed}),
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
+
+
+def _load_saved_session_config() -> dict[str, Any]:
+    try:
+        if _TMP_CONFIG_FILE.exists():
+            return json.loads(_TMP_CONFIG_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {}
 
 
 def get_session():
     global _SHARED_SESSION
     if _SHARED_SESSION is None:
         from worldsim.web_viewer import SimulationSession
-        _SHARED_SESSION = SimulationSession(default_scenario="D01", default_policy="heuristic", default_seed=42)
+        saved = _load_saved_session_config()
+        default_scenario = saved.get("scenario", "D01")
+        default_policy = saved.get("policy", "hybrid_comm")
+        default_seed = int(saved.get("seed", 42))
+        _SHARED_SESSION = SimulationSession(
+            default_scenario=default_scenario,
+            default_policy=default_policy,
+            default_seed=default_seed,
+        )
     return _SHARED_SESSION
+
+
+def _sync_session_if_needed(session: Any, req_scen: str | None, req_pol: str | None, req_seed: int | None) -> None:
+    """Ensure session matches requested scenario/policy/seed (guards against serverless container mismatch)."""
+    target_scen = req_scen or session.scenario_id
+    target_pol = req_pol or session.policy_mode
+    target_seed = req_seed if req_seed is not None else session.seed
+
+    needs_reload = False
+    if req_scen is not None and req_scen != session.scenario_id:
+        needs_reload = True
+    if req_pol is not None and req_pol != session.policy_mode:
+        needs_reload = True
+    if req_seed is not None and req_seed != session.seed:
+        needs_reload = True
+
+    if needs_reload:
+        session.load_scenario(target_scen, target_seed, target_pol)
+        _save_session_config(target_scen, target_pol, target_seed)
 
 
 class handler(BaseHTTPRequestHandler):
@@ -35,7 +84,7 @@ class handler(BaseHTTPRequestHandler):
     def _send_cors(self) -> None:
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, x-scenario-id, x-policy-mode, x-seed")
 
     def do_OPTIONS(self) -> None:
         self.send_response(200)
@@ -84,7 +133,19 @@ class handler(BaseHTTPRequestHandler):
 
             session = get_session()
 
+            # Check query params / headers for session synchronization
+            parsed = urllib.parse.urlparse(self.path)
+            qs = urllib.parse.parse_qs(parsed.query)
+            req_scen = self.headers.get("x-scenario-id") or qs.get("scenario", [None])[0] or qs.get("scenario_id", [None])[0]
+            req_pol = self.headers.get("x-policy-mode") or qs.get("policy", [None])[0] or qs.get("policy_mode", [None])[0]
+            raw_seed = self.headers.get("x-seed") or qs.get("seed", [None])[0]
+            try:
+                req_seed = int(raw_seed) if raw_seed is not None else None
+            except (ValueError, TypeError):
+                req_seed = None
+
             if path == "/api/state":
+                _sync_session_if_needed(session, req_scen, req_pol, req_seed)
                 data = json.dumps(session.get_snapshot()).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
@@ -150,7 +211,25 @@ class handler(BaseHTTPRequestHandler):
 
             session = get_session()
 
+            # Robust payload / header extraction supporting all naming conventions
+            req_scen = (
+                payload.get("scenario_id")
+                or payload.get("scenario")
+                or self.headers.get("x-scenario-id")
+            )
+            req_pol = (
+                payload.get("policy_mode")
+                or payload.get("policy")
+                or self.headers.get("x-policy-mode")
+            )
+            raw_seed = payload.get("seed") or self.headers.get("x-seed")
+            try:
+                req_seed = int(raw_seed) if raw_seed is not None else None
+            except (ValueError, TypeError):
+                req_seed = None
+
             if path == "/api/step":
+                _sync_session_if_needed(session, req_scen, req_pol, req_seed)
                 data = json.dumps(session.step()).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
@@ -158,6 +237,7 @@ class handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(data)
             elif path == "/api/reset":
+                _sync_session_if_needed(session, req_scen, req_pol, req_seed)
                 data = json.dumps(session.reset()).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
@@ -165,10 +245,12 @@ class handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(data)
             elif path == "/api/select":
-                scen_id = payload.get("scenario", "D01")
-                pol = payload.get("policy", "heuristic")
-                seed = int(payload.get("seed", 42))
-                data = json.dumps(session.load_scenario(scen_id, seed, pol)).encode("utf-8")
+                scen_id = req_scen or "D01"
+                pol = req_pol or "hybrid_comm"
+                seed = req_seed if req_seed is not None else 42
+                snapshot = session.load_scenario(scen_id, seed, pol)
+                _save_session_config(scen_id, pol, seed)
+                data = json.dumps(snapshot).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self._send_cors()

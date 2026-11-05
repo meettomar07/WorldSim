@@ -48,7 +48,7 @@ def main() -> None:
     parser.add_argument(
         "--policy",
         default="hybrid_comm",
-        choices=["hybrid_comm", "remediated_comm", "learned_comm", "learned_no_comm", "heuristic", "centralized"],
+        choices=["hybrid_comm", "remediated_comm", "learned_comm", "learned_no_comm", "heuristic", "cbs", "centralized"],
         help="Coordination policy mode (default: hybrid_comm)",
     )
     parser.add_argument("--seed", type=int, default=42, help="RNG seed (default: 42)")
